@@ -2,10 +2,9 @@ name: Android checks
 on:
   push:
     branches: [main, geekplay-e01-improve]
-  pull_request:
   workflow_dispatch:
 concurrency:
-  group: android-checks-${{ github.head_ref || github.ref_name }}
+  group: android-checks-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read

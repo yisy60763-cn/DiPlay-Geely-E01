@@ -54,4 +54,17 @@ object ClusterFlyGate {
         conditions.ecall -> FlyBlock.ECALL
         else -> FlyBlock.NONE
     }
+
+    /**
+     * Closing an already-open layer must not depend on navigation still being armed or on the
+     * provisioning flag still being present. Those are opening prerequisites, not reasons to leave
+     * an existing cluster layer stranded. Timing and active safety interlocks still apply.
+     */
+    fun decideClose(conditions: FlyConditions): FlyBlock = when {
+        conditions.millisSinceLastClusterCommand < MIN_COMMAND_INTERVAL_MILLIS -> FlyBlock.TOO_SOON
+        conditions.reversing -> FlyBlock.REVERSING
+        conditions.radar -> FlyBlock.RADAR
+        conditions.ecall -> FlyBlock.ECALL
+        else -> FlyBlock.NONE
+    }
 }

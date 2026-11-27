@@ -64,6 +64,16 @@ class ClusterFlySequencerTest {
     }
 
     @Test
+    fun `close still works after navigation is no longer armed`() {
+        val steps = ClusterFlySequencer.close(
+            5_000L,
+            openConditions(navigationArmed = false, deviceProvisioned = false, millisSinceLastClusterCommand = 5_000L),
+        )
+        assertEquals(FlyCommand.FLY_RIGHT, steps.first().command)
+        assertEquals(FlyCommand.NAV_BACK, steps.last().command)
+    }
+
+    @Test
     fun `ecall produces no command`() {
         assertEquals(emptyList<FlyStep>(), ClusterFlySequencer.open(0L, openConditions(ecall = true)))
     }

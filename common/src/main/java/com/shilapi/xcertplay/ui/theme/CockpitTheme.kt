@@ -10,7 +10,7 @@ enum class AppSkin(val key: String) {
     GEEK_DARK("geek_dark");
 
     companion object {
-        fun fromKey(key: String?): AppSkin = entries.find { it.key == key } ?: ZEEKR_WHITE
+        fun fromKey(key: String?): AppSkin = entries.find { it.key == key } ?: GEEK_DARK
     }
 }
 

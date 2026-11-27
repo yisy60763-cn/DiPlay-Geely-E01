@@ -396,8 +396,11 @@ internal class FlyTextureMirror(private val log: (String) -> Unit) {
         }
         centerEgl = null
         clusterEgl = null
-        if (eglDisplay != null && eglContext != null) {
-            EGL14.eglDestroyContext(eglDisplay, eglContext)
+        if (eglDisplay != null) {
+            if (eglContext != null && eglContext != EGL14.EGL_NO_CONTEXT) {
+                EGL14.eglDestroyContext(eglDisplay, eglContext)
+            }
+            // Terminate even when context creation failed partway through initialization.
             EGL14.eglTerminate(eglDisplay)
         }
         context = null

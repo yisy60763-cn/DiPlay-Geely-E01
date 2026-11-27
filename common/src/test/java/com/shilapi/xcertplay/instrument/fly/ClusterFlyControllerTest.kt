@@ -752,4 +752,25 @@ class ClusterFlyControllerTest {
         scheduled.removeAt(0).second()
         assertEquals(listOf(FlyCommand.NAV_MODE_OFF, FlyCommand.NAV_OFF), sent)
     }
+
+
+    @Test
+    fun `radar activation while waiting aborts the pending fly safely`() {
+        val controller = waiting()
+        controller.onRadar(true)
+        assertEquals(FlyPhase.IDLE, controller.phase)
+        assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
+        assertTrue(sent.contains(FlyCommand.NAV_OFF))
+        assertTrue(lines.contains("fly.safety radar"))
+    }
+
+    @Test
+    fun `ecall activation while waiting aborts the pending fly safely`() {
+        val controller = waiting()
+        controller.onEcall(true)
+        assertEquals(FlyPhase.IDLE, controller.phase)
+        assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
+        assertTrue(sent.contains(FlyCommand.NAV_OFF))
+        assertTrue(lines.contains("fly.safety ecall"))
+    }
 }

@@ -11,13 +11,13 @@ val localAuthenticationAssets = gradle.startParameter.projectProperties["authAss
 android {
     namespace = "com.shilapi.xcertplay"
     compileSdk {
-        version = release(37)
+        version = release(36)
     }
 
     defaultConfig {
         applicationId = "com.shihab.diplay"
         minSdk = 19
-        targetSdk = 37
+        targetSdk = 36
         multiDexEnabled = true
         versionCode = 51
         versionName = "0.5.1-geely"

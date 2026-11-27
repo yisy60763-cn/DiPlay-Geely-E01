@@ -44,7 +44,6 @@ internal class FlyOutputHandoff(
                     if (ticket != generation) return@replaceOutput
                     onStep("attach", attached)
                     if (!attached) {
-                        closeMirror()
                         fail(ticket, onFailed)
                         return@replaceOutput
                     }

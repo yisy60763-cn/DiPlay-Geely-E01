@@ -2,6 +2,8 @@ package com.shilapi.xcertplay.instrument.fly
 
 import android.view.Surface
 
+private const val MAX_RESTORE_ATTEMPTS = 3
+
 /**
  * Moves the centre decoder onto a texture and back.
  *

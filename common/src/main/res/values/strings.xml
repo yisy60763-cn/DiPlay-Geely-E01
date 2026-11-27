@@ -505,6 +505,7 @@
     <string name="skin_zeekr_white">Dawn white</string>
     <string name="skin_flyme_blue">Sky blue</string>
     <string name="skin_night">Night</string>
+    <string name="skin_geek_dark">Geek cockpit</string>
     <string name="hud_day">Day</string>
     <string name="hud_night">Night</string>
     <string name="hud_audio_saved">Audio %1$d · applies on the next connection</string>

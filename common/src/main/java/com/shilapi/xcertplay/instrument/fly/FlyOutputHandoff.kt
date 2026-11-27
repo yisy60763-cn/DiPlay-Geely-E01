@@ -73,11 +73,7 @@ internal class FlyOutputHandoff(
             finish(onDone)
             return
         }
-        replaceOutput(back) {
-            if (ticket != generation) return@replaceOutput
-            closeMirror()
-            finish(onDone)
-        }
+        restoreCenter(ticket, back, onDone, closeAfterRestore = true)
     }
 
     private fun fail(ticket: Int, onFailed: () -> Unit) {
@@ -87,9 +83,31 @@ internal class FlyOutputHandoff(
             finish(onFailed)
             return
         }
-        replaceOutput(back) {
+        restoreCenter(ticket, back, onFailed, closeAfterRestore = true)
+    }
+
+    /**
+     * Never tear down EGL while the decoder may still be writing into its texture.
+     * A rejected restore is retried; after the bounded attempts the mirror is deliberately
+     * retained and the completion callback is withheld so the owner cannot dismiss its windows.
+     */
+    private fun restoreCenter(
+        ticket: Int,
+        back: Surface,
+        onRestored: () -> Unit,
+        closeAfterRestore: Boolean,
+        attemptsLeft: Int = MAX_RESTORE_ATTEMPTS,
+    ) {
+        replaceOutput(back) { restored ->
             if (ticket != generation) return@replaceOutput
-            finish(onFailed)
+            if (!restored) {
+                if (attemptsLeft > 1) {
+                    restoreCenter(ticket, back, onRestored, closeAfterRestore, attemptsLeft - 1)
+                }
+                return@replaceOutput
+            }
+            if (closeAfterRestore) closeMirror()
+            finish(onRestored)
         }
     }
 

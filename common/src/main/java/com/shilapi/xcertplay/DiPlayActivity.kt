@@ -2076,6 +2076,9 @@ class DiPlayActivity : ComponentActivity() {
         if (reason != WirelessSyncReason.PRE_CONNECT &&
             radioAlreadyMatches(target, hotspotOn, hotspotOff, stationOn, stationOff)
         ) {
+            if (reason == WirelessSyncReason.APP_START) {
+                DiagLog.i(TAG_CAR_HOTSPOT, "app-start hotspot already matches target=$target")
+            }
             return
         }
         if (clearsCooldown(reason)) {

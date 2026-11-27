@@ -103,6 +103,34 @@ class ClusterFlySessionTest {
 
     /** A right swipe made too quickly still has to close the layer; it just has to wait. */
     @Test
+    fun `radar while waiting withdraws the layer after it clears`() {
+        session.onLeft(1_000L, openConditions())
+        session.onWaitTimeout(3_000L)
+        val interrupted = session.onSafety(openConditions(radar = true), 3_050L)
+        assertEquals(FlyPhase.CLOSING, interrupted.phase)
+        assertFalse(interrupted.push)
+        assertTrue(interrupted.steps.isEmpty())
+
+        val cleared = session.onSafety(openConditions(millisSinceLastClusterCommand = 5_000), 6_000L)
+        assertEquals(FlyPhase.CLOSING, cleared.phase)
+        assertEquals(FlyCommand.FLY_RIGHT, cleared.steps.first().command)
+    }
+
+    @Test
+    fun `ecall while waiting withdraws the layer after it clears`() {
+        session.onLeft(1_000L, openConditions())
+        session.onWaitTimeout(3_000L)
+        val interrupted = session.onSafety(openConditions(ecall = true), 3_050L)
+        assertEquals(FlyPhase.CLOSING, interrupted.phase)
+        assertFalse(interrupted.push)
+        assertTrue(interrupted.steps.isEmpty())
+
+        val cleared = session.onSafety(openConditions(millisSinceLastClusterCommand = 5_000), 6_000L)
+        assertEquals(FlyPhase.CLOSING, cleared.phase)
+        assertEquals(FlyCommand.FLY_RIGHT, cleared.steps.first().command)
+    }
+
+    @Test
     fun `a right inside one second still closes at the boundary`() {
         pushing()
 

@@ -1,7 +1,7 @@
 name: Android checks
 on:
   push:
-    branches: [main]
+    branches: [main, geekplay-e01-improve]
   pull_request:
   workflow_dispatch:
 permissions:

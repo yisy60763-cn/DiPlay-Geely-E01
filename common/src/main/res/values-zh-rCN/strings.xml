@@ -504,6 +504,7 @@
     <string name="skin_zeekr_white">晨曦白</string>
     <string name="skin_flyme_blue">晴空蓝</string>
     <string name="skin_night">暗夜</string>
+    <string name="skin_geek_dark">Geek 座舱</string>
     <string name="hud_day">日间</string>
     <string name="hud_night">夜间</string>
     <string name="hud_audio_saved">音频 %1$d · 下次连接生效</string>

@@ -49,4 +49,40 @@ class CockpitThemeTest {
         assertEquals(0xFFF4F6FA.toInt(), paletteDay.screenBg)
         assertEquals(0xFFFF5E00.toInt(), paletteDay.accent) // 极氪橙
     }
+
+    @Test
+    fun testGeekSkinIsFixedDarkAcrossSchedulesAndCarModes() {
+        val expected = CockpitThemeManager.GEEK_DARK_PALETTE
+        listOf(
+            ThemeSchedule.AUTO_CAR,
+            ThemeSchedule.AUTO_TIME,
+            ThemeSchedule.MANUAL
+        ).forEach { schedule ->
+            assertEquals(
+                expected,
+                CockpitThemeManager.resolvePalette(
+                    skin = AppSkin.GEEK_DARK,
+                    schedule = schedule,
+                    uiMode = Configuration.UI_MODE_NIGHT_NO,
+                    currentHour = 12
+                )
+            )
+            assertEquals(
+                expected,
+                CockpitThemeManager.resolvePalette(
+                    skin = AppSkin.GEEK_DARK,
+                    schedule = schedule,
+                    uiMode = Configuration.UI_MODE_NIGHT_YES,
+                    currentHour = 23
+                )
+            )
+        }
+    }
+
+    @Test
+    fun testGeekSkinIsFallbackForUnknownAndMissingKeys() {
+        assertEquals(AppSkin.GEEK_DARK, AppSkin.fromKey(null))
+        assertEquals(AppSkin.GEEK_DARK, AppSkin.fromKey("unknown_skin"))
+        assertEquals(AppSkin.GEEK_DARK, AppSkin.fromKey("geek_dark"))
+    }
 }

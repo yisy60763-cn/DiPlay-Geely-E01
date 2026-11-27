@@ -821,7 +821,7 @@ class DiPlayActivity : ComponentActivity() {
         column.addView(
             label(getString(R.string.appearance), 20, palette.textMain, true).apply { setPadding(0, dp(10), 0, 0) },
         )
-        val skins = listOf(AppSkin.ZEEKR_WHITE, AppSkin.FLYME_WHITE, AppSkin.NIGHT_DARK)
+        val skins = listOf(AppSkin.ZEEKR_WHITE, AppSkin.FLYME_WHITE, AppSkin.NIGHT_DARK, AppSkin.GEEK_DARK)
         themeChooser(
             column,
             getString(R.string.appearance),
@@ -829,6 +829,7 @@ class DiPlayActivity : ComponentActivity() {
                 getString(R.string.skin_zeekr_white),
                 getString(R.string.skin_flyme_blue),
                 getString(R.string.skin_night),
+                getString(R.string.skin_geek_dark),
             ),
             skins.indexOf(AirPlayPersistence.loadAppSkin(this)),
         ) { index ->

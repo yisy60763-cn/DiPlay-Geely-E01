@@ -496,7 +496,19 @@ class ClusterFlyController(
     private fun safetyChanged(block: FlyBlock?) {
         if (block != null) log(ClusterFlyLog.safetyOn(block)) else log(ClusterFlyLog.safetyOff())
         val now = clock()
-        handle(session.onSafety(conditions(now), now))
+        val phaseBefore = session.currentPhase
+        val effect = session.onSafety(conditions(now), now)
+        handle(effect)
+        // The session stops pushing as soon as radar/eCall becomes active, but the Activity owns
+        // the Presentation and decoder handoff. Tell it to restore the centre output and dismiss
+        // the cluster window; waiting for a later right swipe would leave the safety overlay live.
+        if (
+            block != null &&
+            (phaseBefore == FlyPhase.WAITING_FOR_VIDEO || phaseBefore == FlyPhase.PUSHING) &&
+            effect.phase == FlyPhase.CLOSING
+        ) {
+            onGiveUp()
+        }
     }
 
     private fun millisUntilMcuReady(now: Long): Long {

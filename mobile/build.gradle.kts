@@ -108,7 +108,7 @@ dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(project(":common"))
     implementation(project(":shared"))
-    implementation("androidx.multidex:multidex:2.0.1")
+    implementation(libs.androidx.multidex)
 }
 
 // No implicit import. Only the two explicitly selected local runtime assets are allowed.

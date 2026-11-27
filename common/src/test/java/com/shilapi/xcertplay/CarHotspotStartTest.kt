@@ -9,13 +9,14 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
+import com.shilapi.xcertplay.transport.WirelessHotspotMode
 
 /**
  * Opening the app with the switch on actually reaches the hotspot controller.
  *
  * The decision itself — that the switch is off by default and only means anything for the car's own
- * hotspot — is [CarHotspotAutoStartTest]. What this pins is the half a decision cannot show: that the
- * answer is acted on, off the main thread, and written where a report can read it.
+ * hotspot — is [CarHotspotAutoStartTest]. What this pins is the half a decision cannot show: that
+ * the answer is acted on, off the main thread, and written where a report can read it.
  *
  * Only the switch-on direction is asserted. A negative here would be "nothing was logged in the time
  * we waited", which a slow machine turns into a passing test for the wrong reason; the switch-off
@@ -25,12 +26,22 @@ import org.robolectric.shadows.ShadowLog
 @Config(sdk = [28], qualifiers = "en")
 class CarHotspotStartTest {
     @Test fun openingTheAppWithTheSwitchOnAsksForTheCarsHotspot() {
-        Robolectric.buildActivity(
-            DiPlayActivity::class.java,
-            Intent(RuntimeEnvironment.getApplication(), DiPlayActivity::class.java),
-        ).setup().get()
+        val app = RuntimeEnvironment.getApplication()
+        // This is an integration test of the enabled path: do not rely on the default-off preference.
+        AirPlayPersistence.saveWirelessEnabled(app, true)
+        AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.MANUAL)
+        AirPlayPersistence.saveAutoCarHotspot(app, true)
 
-        assertTrue("the attempt is made and written down", hotspotAttemptWasLogged())
+        try {
+            Robolectric.buildActivity(
+                DiPlayActivity::class.java,
+                Intent(app, DiPlayActivity::class.java),
+            ).setup().get()
+
+            assertTrue("the attempt is made and written down", hotspotAttemptWasLogged())
+        } finally {
+            AirPlayPersistence.saveAutoCarHotspot(app, false)
+        }
     }
 
     /** The controller is polled off the main thread, so the line arrives after `setup` returns. */

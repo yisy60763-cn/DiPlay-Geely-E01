@@ -10,7 +10,8 @@ data class FlyDisplayInfo(
 
 fun chooseClusterDisplay(displays: List<FlyDisplayInfo>): FlyDisplayInfo? {
     val candidates = displays.filter { !it.defaultDisplay && it.id != 0 }
-    return candidates.firstOrNull { it.width == 1920 && it.height == 720 } ?: candidates.firstOrNull()
+    return candidates.firstOrNull { it.width == 1920 && it.height == 720 }
+        ?: candidates.singleOrNull()
 }
 
 fun displayLines(displays: List<FlyDisplayInfo>, chosen: FlyDisplayInfo?): List<String> {

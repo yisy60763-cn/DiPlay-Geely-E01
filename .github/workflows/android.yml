@@ -25,7 +25,7 @@ jobs:
       - name: Run android-actions/setup-android@v3
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;25.2.9519653
+          packages: platform-tools platforms;android-37 build-tools;36.0.0 ndk;25.2.9519653
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests
         shell: bash

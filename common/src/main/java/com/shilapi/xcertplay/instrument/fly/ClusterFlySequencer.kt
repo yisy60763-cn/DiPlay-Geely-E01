@@ -65,7 +65,7 @@ object ClusterFlySequencer {
         }
 
     fun close(nowMillis: Long, conditions: FlyConditions): List<FlyStep> =
-        if (ClusterFlyGate.decide(conditions) != FlyBlock.NONE) {
+        if (ClusterFlyGate.decideClose(conditions) != FlyBlock.NONE) {
             emptyList()
         } else {
             listOf(

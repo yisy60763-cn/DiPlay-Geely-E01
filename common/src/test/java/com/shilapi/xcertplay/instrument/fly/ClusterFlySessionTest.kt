@@ -96,7 +96,8 @@ class ClusterFlySessionTest {
         val display = session.onDisplayReady(3_100L)
 
         assertFalse(display.push)
-        assertEquals(FlyPhase.WAITING_FOR_VIDEO, display.phase)
+        // The layer was already raised; safety interruption now owes a close.
+        assertEquals(FlyPhase.CLOSING, display.phase)
         assertEquals(FlyBlock.RADAR, display.warning)
     }
 

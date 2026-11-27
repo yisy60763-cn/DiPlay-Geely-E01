@@ -91,14 +91,14 @@ class ClusterFlySessionTest {
     fun `a display under radar is refused`() {
         session.onLeft(1_000L, openConditions())
         session.onWaitTimeout(3_000L)
-        session.onSafety(openConditions(radar = true), 3_050L)
+        val safety = session.onSafety(openConditions(radar = true), 3_050L)
+        assertFalse(safety.push)
+        assertEquals(FlyPhase.CLOSING, safety.phase)
+        assertEquals(FlyBlock.RADAR, safety.warning)
 
         val display = session.onDisplayReady(3_100L)
-
         assertFalse(display.push)
-        // The layer was already raised; safety interruption now owes a close.
         assertEquals(FlyPhase.CLOSING, display.phase)
-        assertEquals(FlyBlock.RADAR, display.warning)
     }
 
     /** A right swipe made too quickly still has to close the layer; it just has to wait. */

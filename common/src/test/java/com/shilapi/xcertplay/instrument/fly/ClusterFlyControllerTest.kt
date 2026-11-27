@@ -763,7 +763,7 @@ class ClusterFlyControllerTest {
         assertTrue(lines.contains("fly.safety radar"))
         controller.onRadar(false)
         now = 4_000L
-        scheduled.filter { it.first == 1_000L }.forEach { it.second() }
+        scheduled.last { it.first == 1_000L }.second()
         assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
     }
 
@@ -776,7 +776,7 @@ class ClusterFlyControllerTest {
         assertTrue(lines.contains("fly.safety ecall"))
         controller.onEcall(false)
         now = 4_000L
-        scheduled.filter { it.first == 1_000L }.forEach { it.second() }
+        scheduled.last { it.first == 1_000L }.second()
         assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
     }
 }

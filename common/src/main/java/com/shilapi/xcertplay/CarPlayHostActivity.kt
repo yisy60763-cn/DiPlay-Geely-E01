@@ -2892,16 +2892,20 @@ class CarPlayHostActivity : ComponentActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ACTION_RADAR_STATUS -> {
-                    val active = intent.getIntExtra(EXTRA_RADAR_STATE, 0) == 1
+                    // This receiver is exported so the factory's separate system app can reach it.
+                    // Ignore malformed payloads: a missing extra must never look like "radar off".
+                    val state = intent.getIntExtra(EXTRA_RADAR_STATE, INVALID_RADAR_STATE)
+                    if (state != 0 && state != 1) return
+                    val active = state == 1
                     flyRadarActive = active
                     clusterFly?.onRadar(active)
                 }
 
                 ACTION_ECALL_STATUS -> {
-                    val type = intent.getStringExtra(EXTRA_ECALL_TYPE)
-                    val status = intent.getStringExtra(EXTRA_ECALL_STATUS)
-                    val active = type == ECALL_TYPE &&
-                        (status == ECALL_SENDING || status == ECALL_INCOMING)
+                    val type = intent.getStringExtra(EXTRA_ECALL_TYPE) ?: return
+                    val status = intent.getStringExtra(EXTRA_ECALL_STATUS) ?: return
+                    if (type != ECALL_TYPE) return
+                    val active = status == ECALL_SENDING || status == ECALL_INCOMING
                     flyEcallActive = active
                     clusterFly?.onEcall(active)
                 }
@@ -3415,6 +3419,7 @@ class CarPlayHostActivity : ComponentActivity() {
         /** The factory's public safety broadcasts. Reversing has none; that is why it is unknown. */
         const val ACTION_RADAR_STATUS = "com.neusoft.radarDefanceView"
         const val EXTRA_RADAR_STATE = "state"
+        const val INVALID_RADAR_STATE = -1
         const val ACTION_ECALL_STATUS = "com.neusoft.ecallForThreeFinger"
         const val EXTRA_ECALL_TYPE = "CallType"
         const val EXTRA_ECALL_STATUS = "CallStatus"

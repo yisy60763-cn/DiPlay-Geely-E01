@@ -138,6 +138,7 @@ object CockpitThemeManager {
             AppSkin.ZEEKR_WHITE -> ZEEKR_WHITE_PALETTE
             AppSkin.FLYME_WHITE -> FLYME_WHITE_PALETTE
             AppSkin.NIGHT_DARK -> NIGHT_DARK_PALETTE
+            AppSkin.GEEK_DARK -> GEEK_DARK_PALETTE
         }
     }
 }

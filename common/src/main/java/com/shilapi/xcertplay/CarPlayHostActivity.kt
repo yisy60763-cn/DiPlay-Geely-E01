@@ -2786,9 +2786,14 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
         handoff.end { finish() }
-        // The restore is one job on the decoder thread. A dead or busy decoder would otherwise hold
-        // the window open forever: after one second the teardown is finished regardless.
-        mainHandler.postDelayed({ if (flyClosing) finish() }, FLY_TEARDOWN_FALLBACK_MILLIS)
+        // Never force teardown on a timeout: if the decoder rejected its centre Surface,
+        // closing EGL would release the texture it may still be writing into and black out the
+        // centre display. FlyOutputHandoff retries restoration; this timer is diagnostic only.
+        mainHandler.postDelayed({
+            if (flyClosing && flyHandoff === handoff) {
+                DiagLog.i(ClusterFlyLog.TAG, "fly.display restore pending; mirror retained")
+            }
+        }, FLY_TEARDOWN_FALLBACK_MILLIS)
     }
 
     /**

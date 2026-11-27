@@ -755,6 +755,84 @@ class ClusterFlyControllerTest {
 
 
     @Test
+    fun `radar during arming cancels queued open commands`() {
+        val controller = controller()
+        controller.onGesture(Decision.FLY_LEFT)
+        assertEquals(listOf(FlyCommand.NAV_ON, FlyCommand.NAV_MODE_ON), sent)
+
+        controller.onRadar(true)
+        assertEquals(FlyPhase.IDLE, controller.phase)
+        assertEquals(
+            listOf(
+                FlyCommand.NAV_ON,
+                FlyCommand.NAV_MODE_ON,
+                FlyCommand.NAV_MODE_OFF,
+                FlyCommand.NAV_OFF,
+            ),
+            sent,
+        )
+
+        // The queued NAV_FRONT and FLY_LEFT belong to the cancelled generation. Only the
+        // scheduled withdrawal's NAV_BACK is allowed to run.
+        now = 3_000L
+        runScheduled()
+        assertFalse(sent.contains(FlyCommand.NAV_FRONT))
+        assertFalse(sent.contains(FlyCommand.FLY_LEFT))
+        assertEquals(FlyCommand.NAV_BACK, sent.last())
+    }
+
+    @Test
+    fun `radar during playback dismisses the mirror and owes the close until clear`() {
+        var giveUps = 0
+        val controller = ClusterFlyController(
+            commands = { sent.add(it) },
+            showWarning = { warnings.add(it) },
+            log = { lines.add(it) },
+            clock = { now },
+            postDelayed = { delay, action -> scheduled.add(delay to action) },
+            onGiveUp = { giveUps++ },
+        )
+        controller.onGesture(Decision.FLY_LEFT)
+        now = 3_000L
+        runScheduled()
+        now = 3_100L
+        controller.onMirrorReady()
+        assertEquals(FlyPhase.PUSHING, controller.phase)
+
+        now = 3_200L
+        controller.onRadar(true)
+        assertEquals(FlyPhase.CLOSING, controller.phase)
+        assertEquals(1, giveUps)
+        assertFalse(sent.contains(FlyCommand.FLY_RIGHT))
+
+        // The close is not sent while radar is active. Clearing the interlock releases it.
+        now = 5_200L
+        controller.onRadar(false)
+        assertTrue(sent.contains(FlyCommand.FLY_RIGHT))
+        assertEquals(1, giveUps)
+    }
+
+    @Test
+    fun `radar during the video wait dismisses the pending presentation`() {
+        var giveUps = 0
+        val controller = ClusterFlyController(
+            commands = { sent.add(it) },
+            showWarning = { warnings.add(it) },
+            log = { lines.add(it) },
+            clock = { now },
+            postDelayed = { delay, action -> scheduled.add(delay to action) },
+            onGiveUp = { giveUps++ },
+        )
+        openToLeft(controller)
+        assertEquals(FlyPhase.WAITING_FOR_VIDEO, controller.phase)
+
+        controller.onRadar(true)
+
+        assertEquals(FlyPhase.CLOSING, controller.phase)
+        assertEquals(1, giveUps)
+    }
+
+    @Test
     fun `radar activation while waiting aborts the pending fly safely`() {
         val controller = waiting()
         controller.onRadar(true)

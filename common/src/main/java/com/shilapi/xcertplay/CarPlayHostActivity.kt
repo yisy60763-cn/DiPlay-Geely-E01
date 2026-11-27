@@ -609,12 +609,18 @@ class CarPlayHostActivity : ComponentActivity() {
         loadPersistedSettings()
         locationPermissionAvailable = hasFineLocationPermission()
         setContentView(buildContentView())
-        registerReceiver(
+        // The radar and eCall broadcasts are sent by the factory's separate system app.
+        // Explicitly mark this receiver exported for Android 13+ (targetSdk 36); the legacy
+        // overload can throw when registering for these non-platform actions. The head unit's
+        // Android 5.1 runtime is handled by AndroidX's compatibility implementation.
+        ContextCompat.registerReceiver(
+            this,
             flySafetyReceiver,
             IntentFilter().apply {
                 addAction(ACTION_RADAR_STATUS)
                 addAction(ACTION_ECALL_STATUS)
             },
+            ContextCompat.RECEIVER_EXPORTED,
         )
         applyFullscreenMode()
         onBackPressedDispatcher.addCallback(

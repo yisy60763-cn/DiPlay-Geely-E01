@@ -183,6 +183,11 @@ class CarPlayHostActivity : ComponentActivity() {
      * never fly, and until one does there is no socket and no encoder to speak of.
      */
     private var clusterFly: ClusterFlyController? = null
+    // Safety broadcasts arrive as soon as the Activity is created, while the fly controller is
+    // deliberately lazy. Keep the latest states so the first swipe cannot miss an already-active
+    // radar warning or emergency call.
+    private var flyRadarActive = false
+    private var flyEcallActive = false
     private var flyClusterPresentation: FlyClusterPresentation? = null
     /** The window handoff and the texture mirror for the fly in progress, if any. */
     private var flyHandoff: FlyOutputHandoff? = null
@@ -2592,7 +2597,11 @@ class CarPlayHostActivity : ComponentActivity() {
                     runOnUiThread { report(witness) }
                 }
             },
-        ).also { clusterFly = it }
+        ).also { controller ->
+            clusterFly = controller
+            if (flyRadarActive) controller.onRadar(true)
+            if (flyEcallActive) controller.onEcall(true)
+        }
 
     /**
      * Puts the fly picture on the cluster's own display.
@@ -2876,14 +2885,18 @@ class CarPlayHostActivity : ComponentActivity() {
     private val flySafetyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                ACTION_RADAR_STATUS ->
-                    clusterFly?.onRadar(intent.getIntExtra(EXTRA_RADAR_STATE, 0) == 1)
+                ACTION_RADAR_STATUS -> {
+                    val active = intent.getIntExtra(EXTRA_RADAR_STATE, 0) == 1
+                    flyRadarActive = active
+                    clusterFly?.onRadar(active)
+                }
 
                 ACTION_ECALL_STATUS -> {
                     val type = intent.getStringExtra(EXTRA_ECALL_TYPE)
                     val status = intent.getStringExtra(EXTRA_ECALL_STATUS)
                     val active = type == ECALL_TYPE &&
                         (status == ECALL_SENDING || status == ECALL_INCOMING)
+                    flyEcallActive = active
                     clusterFly?.onEcall(active)
                 }
             }

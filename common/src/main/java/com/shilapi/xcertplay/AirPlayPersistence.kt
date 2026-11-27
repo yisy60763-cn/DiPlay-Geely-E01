@@ -498,7 +498,7 @@ object AirPlayPersistence {
     fun loadAppSkin(context: Context): AppSkin =
         AppSkin.fromKey(
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getString(KEY_APP_SKIN, AppSkin.ZEEKR_WHITE.key),
+                .getString(KEY_APP_SKIN, AppSkin.GEEK_DARK.key),
         )
 
     fun saveAppSkin(context: Context, skin: AppSkin) {

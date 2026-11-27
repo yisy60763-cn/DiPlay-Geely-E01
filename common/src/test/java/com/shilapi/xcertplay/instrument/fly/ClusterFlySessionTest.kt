@@ -179,6 +179,39 @@ class ClusterFlySessionTest {
     }
 
     @Test
+    fun `radar during arming cancels the pending open and withdraws navigation`() {
+        session.onLeft(1_000L, openConditions())
+
+        val interrupted = session.onSafety(openConditions(radar = true), 1_500L)
+
+        assertEquals(FlyPhase.IDLE, interrupted.phase)
+        assertFalse(interrupted.push)
+        assertEquals(FlyBlock.RADAR, interrupted.warning)
+        assertEquals(
+            listOf(FlyCommand.NAV_MODE_OFF, FlyCommand.NAV_OFF, FlyCommand.NAV_BACK),
+            interrupted.steps.map { it.command },
+        )
+        assertTrue(interrupted.steps.all { it.retraction })
+        assertEquals(FlyPhase.IDLE, session.onWaitTimeout(3_000L).phase)
+    }
+
+    @Test
+    fun `ecall during arming cancels the pending open and withdraws navigation`() {
+        session.onLeft(1_000L, openConditions())
+
+        val interrupted = session.onSafety(openConditions(ecall = true), 1_500L)
+
+        assertEquals(FlyPhase.IDLE, interrupted.phase)
+        assertFalse(interrupted.push)
+        assertEquals(FlyBlock.ECALL, interrupted.warning)
+        assertEquals(
+            listOf(FlyCommand.NAV_MODE_OFF, FlyCommand.NAV_OFF, FlyCommand.NAV_BACK),
+            interrupted.steps.map { it.command },
+        )
+        assertTrue(interrupted.steps.all { it.retraction })
+    }
+
+    @Test
     fun `abort from arming returns to idle without fly right`() {
         session.onLeft(1_000L, openConditions())
         assertEquals(FlyPhase.ARMING, session.currentPhase)

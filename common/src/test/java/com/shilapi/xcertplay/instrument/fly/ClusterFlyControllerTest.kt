@@ -761,9 +761,15 @@ class ClusterFlyControllerTest {
         assertEquals(FlyPhase.CLOSING, controller.phase)
         assertFalse(sent.contains(FlyCommand.NAV_MODE_OFF))
         assertTrue(lines.contains("fly.safety on RADAR"))
+        val beforeClear = scheduled.size
         controller.onRadar(false)
+        val closeCallbacks = scheduled.drop(beforeClear)
         now = 4_000L
-        scheduled.last { it.first == 1_000L }.second()
+        closeCallbacks.first { it.first == 1_000L }.second()
+        assertTrue(sent.contains(FlyCommand.FLY_RIGHT))
+        assertFalse(sent.contains(FlyCommand.NAV_MODE_OFF))
+        now = 5_000L
+        closeCallbacks.first { it.first == 2_000L }.second()
         assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
     }
 
@@ -774,9 +780,15 @@ class ClusterFlyControllerTest {
         assertEquals(FlyPhase.CLOSING, controller.phase)
         assertFalse(sent.contains(FlyCommand.NAV_MODE_OFF))
         assertTrue(lines.contains("fly.safety on ECALL"))
+        val beforeClear = scheduled.size
         controller.onEcall(false)
+        val closeCallbacks = scheduled.drop(beforeClear)
         now = 4_000L
-        scheduled.last { it.first == 1_000L }.second()
+        closeCallbacks.first { it.first == 1_000L }.second()
+        assertTrue(sent.contains(FlyCommand.FLY_RIGHT))
+        assertFalse(sent.contains(FlyCommand.NAV_MODE_OFF))
+        now = 5_000L
+        closeCallbacks.first { it.first == 2_000L }.second()
         assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
     }
 }

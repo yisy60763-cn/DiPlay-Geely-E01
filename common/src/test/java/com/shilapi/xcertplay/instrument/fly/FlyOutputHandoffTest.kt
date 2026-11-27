@@ -76,6 +76,30 @@ class FlyOutputHandoffTest {
         assertEquals(listOf("detach", "restore", "close", "done"), calls)
     }
 
+    @Test fun repeatedEndDuringRestoreWaitsAndRunsBothCallbacks() {
+        var restore: ((Boolean) -> Unit)? = null
+        val handoff = FlyOutputHandoff(
+            replaceOutput = { surface, applied ->
+                val kind = when {
+                    surface == null -> "detach"
+                    surface === center -> "restore"
+                    else -> "attach"
+                }
+                calls += kind
+                if (kind == "restore") restore = applied else applied(true)
+            },
+            openMirror = { _, _, onTexture, _ -> onTexture(surface("texture")) },
+            closeMirror = { calls += "close" },
+        )
+        handoff.begin(newCenter(), surface("cluster"), onReady = {}, onFailed = {})
+        calls.clear()
+        handoff.end { calls += "done-1" }
+        handoff.end { calls += "done-2" }
+        assertEquals(listOf("restore"), calls)
+        restore?.invoke(true)
+        assertEquals(listOf("restore", "close", "done-1", "done-2"), calls)
+    }
+
     private fun newCenter(): Surface = surface("center").also { center = it }
 
     private fun surface(name: String) = Surface(android.graphics.SurfaceTexture(name.hashCode()))

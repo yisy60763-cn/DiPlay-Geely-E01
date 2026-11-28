@@ -879,12 +879,13 @@ class ClusterFlyControllerTest {
 
         controller.onRadar(true)
         assertFalse(sent.contains(FlyCommand.NAV_FRONT))
-        assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
-        assertTrue(sent.contains(FlyCommand.NAV_OFF))
 
-        // The pre-arm front timer is invalidated; the withdrawal back step is the only delayed MCU step.
+        // Withdrawal can be queued behind the MCU spacing guard; run the scheduled step
+        // rather than assuming NAV_MODE_OFF and NAV_OFF are emitted synchronously.
         now = 2_000L
         runScheduled()
+        assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
+        assertTrue(sent.contains(FlyCommand.NAV_OFF))
         assertFalse(sent.contains(FlyCommand.NAV_FRONT))
         now = 3_000L
         runScheduled()

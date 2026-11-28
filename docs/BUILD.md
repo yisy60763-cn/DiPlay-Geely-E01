@@ -23,7 +23,7 @@ ignored, so the surprise cannot come back one indirection further out.
 | Property | What it does |
 |---|---|
 | `-PauthAssetsDir=<path>` | the accessory identity the package carries |
-| `-PvendorHopDir=<path>` | the car hop directory. Both packages this project hands out require it |
+| `-PvendorHopDir=<path>` | optional vendor Bluetooth override; without it the `CAR` route uses `AndroidIap2BluetoothLink` and the head unit's Android Bluetooth stack |
 | `-Pexperimental=on\|off` | whether the package carries the features that are still being tried on the car — and with them the log-upload key |
 
 `-PcloudLogs` is retired. The key is an experimental feature now, and one switch decides both: the two
@@ -40,6 +40,8 @@ can list processes, and Gradle records `-P` values in its own caches.
 two, and they differ by one build switch:
 
 ```sh
+scripts/package-geely.sh official
+# Optional vendor override:
 DIPLAY_VENDOR_HOP_DIR=/absolute/path/to/the/car-hop scripts/package-geely.sh official
 DIPLAY_VENDOR_HOP_DIR=/absolute/path/to/the/car-hop scripts/package-geely.sh local
 ```

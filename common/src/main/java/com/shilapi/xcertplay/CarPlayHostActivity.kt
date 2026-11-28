@@ -131,7 +131,6 @@ import com.shilapi.xcertplay.instrument.fly.FlyTextureMirror
 import com.shilapi.xcertplay.instrument.fly.FlyTrace
 import com.shilapi.xcertplay.instrument.fly.chooseClusterDisplay
 import com.shilapi.xcertplay.instrument.fly.displayLines
-import com.shilapi.xcertplay.ui.ThreeFingerSwipeDetector
 import com.shilapi.xcertplay.ui.component.QuickHudView
 import java.io.File
 import java.text.SimpleDateFormat
@@ -462,21 +461,6 @@ class CarPlayHostActivity : ComponentActivity() {
     }
     private var sessionLog: SessionLogFile? = null
 
-    /**
-     * The three-finger swipe, as a state machine over the touch stream rather than four booleans in
-     * the middle of the dispatch. See [ThreeFingerSwipeDetector] for what it owns and when.
-     *
-     * Built on first touch, not in the constructor: its distance is in pixels, and an Activity is
-     * constructed before its context is attached — reading the density then is the crash
-     * [CarPlayHostActivityConstructionTest] exists to catch.
-     */
-    private val swipe: ThreeFingerSwipeDetector by lazy {
-        ThreeFingerSwipeDetector(
-            distance = dp(THREE_FINGER_SWIPE_DISTANCE_DP).toFloat(),
-            directionRatio = THREE_FINGER_SWIPE_DIRECTION_RATIO,
-            armWindowMillis = THREE_FINGER_ARM_WINDOW_MILLIS,
-        )
-    }
     private val shuttingDown = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
     /** The Bluetooth stack reports from its own threads; everything it says about the adapter goes through here. */
@@ -854,16 +838,12 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        // A gesture sequence dies with the focus: whatever is left of it is never going to be
-        // finished, and a half-finished one would swallow the first touches after the screen is back.
-        if (!hasFocus) swipe.reset()
         if (hasFocus) applyFullscreenMode()
     }
 
     override fun onStop() {
         // The controller, USB/iAP2 link, and VPN attachment intentionally outlive the UI.
-        swipe.reset()
-        // And so does the bar's timer, but not the bar: it belongs to this window and is put away
+        // The quick bar belongs to this window and is put away when it stops.
         // with it rather than left waiting for a picture that may be gone.
         hideQuickHud()
         super.onStop()
@@ -1139,12 +1119,6 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         primaryAction = primary
         column.addView(primary, LinearLayout.LayoutParams(-1, dp(72)))
-        column.addView(TextView(this).apply {
-            text = getString(R.string.in_carplay_swipe_down_with_three_fingers_to_open_diplay_se)
-            textSize = 13f
-            setTextColor(CONNECTION_MUTED)
-            setPadding(0, dp(16), 0, 0)
-        })
         return column
     }
 
@@ -3395,20 +3369,6 @@ class CarPlayHostActivity : ComponentActivity() {
         const val STEP_PENDING = "○"
         const val AUDIO_CAPTURE_MARKER = "audio-capture.enabled"
         const val AUDIO_CAPTURE_DIRECTORY = "audio-captures"
-        /**
-         * The swipe's geometry. The finger count lives with the detector — it is the one place that
-         * decides what a sequence is, and a second copy here would only drift from it.
-         */
-        const val THREE_FINGER_SWIPE_DISTANCE_DP = 72
-        const val THREE_FINGER_SWIPE_DIRECTION_RATIO = 1.15f
-
-        /**
-         * How long the three fingers have to arrive, counted from the first one landing.
-         *
-         * Without it, two fingers resting on the glass and a thumb coming down anywhere near them
-         * armed the gesture, and the settings page opened on a press the driver had not made.
-         */
-        const val THREE_FINGER_ARM_WINDOW_MILLIS = 350L
         const val MAX_SETTINGS_MENU_WIDTH_PX = 1200
         val MENU_BACKGROUND = Color.rgb(12, 16, 19)
         val MENU_SECONDARY = Color.rgb(170, 180, 190)

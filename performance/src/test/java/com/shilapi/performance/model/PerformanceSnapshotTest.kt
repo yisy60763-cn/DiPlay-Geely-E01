@@ -11,7 +11,7 @@ class PerformanceSnapshotTest {
             memory = MemoryMetrics(usedBytes = 1024L * 1024 * 1200, totalBytes = 1024L * 1024 * 2048, isLowMemory = false),
             storage = StorageMetrics(usedBytes = 1024L * 1024 * 1024 * 18, totalBytes = 1024L * 1024 * 1024 * 32),
             link = LinkMetrics(type = LinkType.WIFI_CLIENT, detail = "5 GHz · 433 Mbps (-48 dBm)"),
-            media = MediaMetrics(rxFps = 30.0f, shownFps = 30.0f, touchLatencyMs = 82, droppedFrames = 0, displayRefreshHz = 60.0f),
+            media = MediaMetrics(rxFps = 30.0f, shownFps = 30.0f, touchLatencyMs = 82, recoveries = 0, displayRefreshHz = 60.0f),
         )
         assertEquals("CPU: 25% (4核 @ 1.5GHz)", snapshot.cpuText)
         assertEquals("RAM: 1.2 GB / 2.0 GB (58%)", snapshot.memoryText)
@@ -43,7 +43,7 @@ class PerformanceSnapshotTest {
             memory = MemoryMetrics(usedBytes = 1024L * 1024 * 1800, totalBytes = 1024L * 1024 * 2048, isLowMemory = true),
             storage = StorageMetrics(usedBytes = 1024L * 1024 * 1024 * 10, totalBytes = 1024L * 1024 * 1024 * 32),
             link = LinkMetrics(type = LinkType.CAR_HOTSPOT, detail = "Geely-Car · 5 GHz"),
-            media = MediaMetrics(rxFps = 60.0f, shownFps = 59.8f, touchLatencyMs = -1, droppedFrames = 2, displayRefreshHz = 60.0f),
+            media = MediaMetrics(rxFps = 60.0f, shownFps = 59.8f, touchLatencyMs = -1, recoveries = 2, displayRefreshHz = 60.0f),
         )
         assertEquals("CPU: 50% (8核 @ 800MHz)", snapshot.cpuText)
         assertEquals("RAM: 1.8 GB / 2.0 GB (87%) [低内存警告]", snapshot.memoryText)

@@ -14,6 +14,7 @@ import java.io.Closeable
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.Inet6Address
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -107,7 +108,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
         val nextSocket = try {
             DatagramSocket(null).apply {
                 reuseAddress = true
-                bind(InetSocketAddress(InetAddress.getByName("::"), 0))
+                bind(InetSocketAddress(InetAddress.getByName(if (config.host is Inet6Address) "::" else "0.0.0.0"), 0))
             }
         } catch (error: Exception) {
             DiagLog.e(TAG, "microphone socket creation failed", error)

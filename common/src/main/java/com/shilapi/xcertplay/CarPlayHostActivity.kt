@@ -954,7 +954,7 @@ class CarPlayHostActivity : ComponentActivity() {
                                 rxFps = it.rxFps,
                                 shownFps = it.shownFps,
                                 touchLatencyMs = it.touchLatencyMs,
-                                droppedFrames = it.recoveries,
+                                recoveries = it.recoveries,
                                 displayRefreshHz = windowManager.defaultDisplay.refreshRate,
                             )
                         }

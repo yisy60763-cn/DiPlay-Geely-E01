@@ -45,6 +45,8 @@ class QuickWidgetsView(
      * where one can only refuse.
      */
     private val sameWifiOffered: Boolean = true,
+    /** Hide wireless setup and Bluetooth maintenance in the wired-only E01 profile. */
+    private val wiredOnly: Boolean = false,
 ) : LinearLayout(context) {
 
     private val hotspotTab: Button
@@ -136,7 +138,7 @@ class QuickWidgetsView(
         }
         if (sameWifiOffered) wireless.addView(wifiRow, LayoutParams(-1, -2).apply { topMargin = dp(10) })
 
-        addView(wireless, LayoutParams(-1, 0, 1.15f))
+        if (!wiredOnly) addView(wireless, LayoutParams(-1, 0, 1.15f))
         addView(View(context).apply { layoutParams = LayoutParams(1, dp(14)) })
 
         val audio = column().apply {
@@ -195,7 +197,7 @@ class QuickWidgetsView(
             })
             setOnClickListener { if (isEnabled) onRestartBluetooth() }
         }
-        addView(bluetoothRow, LayoutParams(-1, dp(64)))
+        if (!wiredOnly) addView(bluetoothRow, LayoutParams(-1, dp(64)))
 
         addView(View(context).apply { layoutParams = LayoutParams(1, dp(14)) })
         addView(drawerCard(onOpenDrawer), LayoutParams(-1, dp(64)))

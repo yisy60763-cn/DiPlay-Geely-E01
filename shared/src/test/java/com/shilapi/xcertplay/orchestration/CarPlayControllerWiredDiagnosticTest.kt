@@ -9,6 +9,45 @@ import org.junit.Test
 
 class CarPlayControllerWiredDiagnosticTest {
     @Test
+    fun dataPathAttemptIsCurrentOnlyWhileControllerAndGenerationStillMatch() {
+        assertTrue(
+            isWiredDataPathAttemptCurrent(
+                closed = false,
+                phaseIsDataPaths = true,
+                expectedGeneration = 7,
+                currentGeneration = 7,
+            ),
+        )
+        assertFalse(
+            "A detach invalidates the generation before an asynchronous USB open can advance",
+            isWiredDataPathAttemptCurrent(
+                closed = false,
+                phaseIsDataPaths = true,
+                expectedGeneration = 7,
+                currentGeneration = 8,
+            ),
+        )
+        assertFalse(
+            "A controller closed while USB open was pending must reject the result",
+            isWiredDataPathAttemptCurrent(
+                closed = true,
+                phaseIsDataPaths = true,
+                expectedGeneration = 7,
+                currentGeneration = 7,
+            ),
+        )
+        assertFalse(
+            "A result from an earlier phase must not start the control stack",
+            isWiredDataPathAttemptCurrent(
+                closed = false,
+                phaseIsDataPaths = false,
+                expectedGeneration = 7,
+                currentGeneration = 7,
+            ),
+        )
+    }
+
+    @Test
     fun physicalDetachIsRecordedAsFirstFaultWhenSessionIsLive() {
         val recorder = FirstFaultRecorder()
         CarPlayController.recordWiredDetachFault(

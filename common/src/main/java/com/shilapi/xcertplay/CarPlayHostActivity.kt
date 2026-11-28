@@ -3096,6 +3096,36 @@ class CarPlayHostActivity : ComponentActivity() {
         return true
     }
 
+    private fun onScreenStreamStateChanged(generation: Int, type: Int, active: Boolean) {
+        runOnUiThread {
+            if (shuttingDown.get() || generation != restartGeneration) return@runOnUiThread
+            if (active) {
+                activeScreenStreamTypes.add(type)
+            } else {
+                activeScreenStreamTypes.remove(type)
+            }
+            updateDebugOverlays()
+        }
+    }
+
+    private fun setStatus(message: String) {
+        runOnUiThread {
+            setConnectionStage(message)
+            appendLog(message)
+        }
+    }
+
+    /**
+     * The sentence describing the step in progress. It is drawn under the rung it belongs to, not
+     * at the top of the card, so "the firmware..." arrives next to the rung it is about.
+     */
+    private fun setConnectionStage(message: String) {
+        latestStage = message
+        renderStepDetail()
+        showHandshakeLine(message)
+        updateDebugOverlays()
+    }
+
     /** Starts a new phone handshake now and cancels a pending automatic retry. */
     private fun retryConnectionNow() {
         if (shuttingDown.get()) return

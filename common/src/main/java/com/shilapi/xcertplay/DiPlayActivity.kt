@@ -191,6 +191,7 @@ class DiPlayActivity : ComponentActivity() {
     private var usbAutoConnectScheduled = false
     private var usbAutoConnectRunnable: Runnable? = null
     private var usbAutoConnectAttempts = 0
+    private var usbTopologyRegistered = false
     private var notificationTransport = true
     private var exportInProgress = false
     private var browseGeneration = 0
@@ -3104,14 +3105,32 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     private fun registerUsbTopology() {
+        if (usbTopologyRegistered) return
         val filter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }
-        runCatching { registerReceiver(usbTopology, filter) }
+        // Android 13+ requires an explicit export policy for context-registered receivers.
+        // USB topology broadcasts are system-owned; do not expose this receiver to other apps.
+        usbTopologyRegistered = runCatching {
+            ContextCompat.registerReceiver(
+                this,
+                usbTopology,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            true
+        }.getOrDefault(false)
+        if (!usbTopologyRegistered) {
+            DiagLog.w("UsbAutoLaunch", "USB topology receiver registration failed")
+        }
     }
 
-    private fun unregisterUsbTopology() = runCatching { unregisterReceiver(usbTopology) }
+    private fun unregisterUsbTopology() {
+        if (!usbTopologyRegistered) return
+        runCatching { unregisterReceiver(usbTopology) }
+        usbTopologyRegistered = false
+    }
 
     /**
      * Media mount events, listened to exactly while the page is up — the same pair of callbacks as

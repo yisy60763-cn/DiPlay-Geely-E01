@@ -1,7 +1,7 @@
 package com.shilapi.xcertplay
 
 import android.content.Intent
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -12,7 +12,7 @@ import org.robolectric.shadows.ShadowLog
 import com.shilapi.xcertplay.transport.WirelessHotspotMode
 
 /**
- * Opening the app with the switch on actually reaches the hotspot controller.
+ * Opening the E01 app never starts the retired wireless hotspot path, even if old preferences request it.
  *
  * The decision itself — that the switch is off by default and only means anything for the car's own
  * hotspot — is [CarHotspotAutoStartTest]. What this pins is the half a decision cannot show: that
@@ -25,7 +25,7 @@ import com.shilapi.xcertplay.transport.WirelessHotspotMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "en")
 class CarHotspotStartTest {
-    @Test fun openingTheAppWithTheSwitchOnAsksForTheCarsHotspot() {
+    @Test fun wiredOnlyStartupDoesNotAskForTheCarsHotspotEvenWhenLegacyPreferenceIsOn() {
         val app = RuntimeEnvironment.getApplication()
         // This is an integration test of the enabled path: do not rely on the default-off preference.
         AirPlayPersistence.saveWirelessEnabled(app, true)
@@ -38,7 +38,7 @@ class CarHotspotStartTest {
                 Intent(app, DiPlayActivity::class.java),
             ).setup().get()
 
-            assertTrue("the attempt is made and written down", hotspotAttemptWasLogged())
+            assertFalse("wired-only startup must not attempt to start the car hotspot", hotspotAttemptWasLogged())
         } finally {
             AirPlayPersistence.saveAutoCarHotspot(app, false)
         }

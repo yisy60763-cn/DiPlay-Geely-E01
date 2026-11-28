@@ -448,8 +448,15 @@ class DiPlayActivity : ComponentActivity() {
         maintenanceWatched?.let { startWatchingMaintenance(it) }
         registerUsbTopology()
         registerMediaMount()
+        // Some Android 5.1 vendor builds do not deliver USB_DEVICE_ATTACHED to a resumed
+        // activity when the cable was connected before DiPlay was brought to the foreground.
+        // Reconcile the current USB topology once on resume as a fallback. The same debounce
+        // used by the broadcast path prevents duplicate connection attempts.
+        if (hasAppleUsbDeviceAttached()) {
+            scheduleUsbAutoConnect("Apple USB device already attached on resume")
+        }
         // Back from the car settings: refresh the car hotspot reminder on the home page.
-        // Opening the app never starts a connection. Wireless or USB is chosen on the connect button.
+        // Wired-only E01 profile starts a connection only for a detected Apple USB device.
         if (initialLaunch) initialLaunch = false
         else render()
         requestWirelessSync(WirelessSyncReason.RESUME)

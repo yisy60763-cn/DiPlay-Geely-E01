@@ -73,7 +73,7 @@ internal object AudioChannelMapper {
         payloadType: Int,
         navigationStreamType: Int,
     ): AudioChannelSelection = when (audioType) {
-        "telephony" -> AudioChannelSelection(AudioChannel.PHONE, AudioContentType.SPEECH)
+        "telephony" -> AudioChannelSelection(AudioChannel.PHONE, AudioContentType.SPEECH, AudioManager.STREAM_VOICE_CALL)
         "speechrecognition" ->
             AudioChannelSelection(AudioChannel.ASSISTANT, AudioContentType.SPEECH)
         "media" -> AudioChannelSelection(AudioChannel.MEDIA, AudioContentType.MUSIC)

@@ -2539,13 +2539,26 @@ class CarPlayController(
      */
     private fun requireCarHopRadioName() {
         if (config.wirelessBluetoothHop != WirelessBluetoothHop.CAR) return
-        val hop = CarBluetoothHops.active ?: throw WirelessIdentityResolver.missingNameException(
-            WirelessBluetoothHop.CAR,
-        )
+
+        // Match the route selected below: use the supplied E01 hop when this build has one for this
+        // head unit; otherwise use the same Android BluetoothAdapter that AndroidIap2BluetoothLink
+        // will use to open the RFCOMM socket. Requiring CarBluetoothHops.active unconditionally made
+        // the public/source-only build fail before it could reach its existing native RFCOMM path.
+        val vendorHop = CarBluetoothHops.transport?.takeIf {
+            runCatching { it.applies(appContext) }.getOrDefault(false)
+        }
         repeat(RADIO_NAME_ATTEMPTS) { attempt ->
-            val name = hop.localName(appContext)?.trim()?.takeIf { it.isNotEmpty() }
+            val name = (if (vendorHop != null) {
+                runCatching { vendorHop.localName(appContext) }.getOrNull()
+            } else {
+                runCatching { bluetoothAdapter?.name }.getOrNull()
+            })?.trim()?.takeIf { it.isNotEmpty() }
             if (name != null) {
-                debugLog("wireless radio name (before the hotspot) =$name attempt=${attempt + 1}")
+                debugLog(
+                    "wireless radio name (before the hotspot) =$name " +
+                        "source=${if (vendorHop != null) "vendor-hop" else "android-adapter"} " +
+                        "attempt=${attempt + 1}",
+                )
                 return
             }
             if (attempt + 1 < RADIO_NAME_ATTEMPTS) {

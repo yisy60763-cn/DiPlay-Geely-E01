@@ -1584,10 +1584,7 @@ class CarPlayController(
             val radioName = WirelessIdentityResolver.resolveRadioName(
                 link = link,
                 hopType = config.wirelessBluetoothHop,
-                fallbackCarHopName = runCatching {
-                    CarBluetoothHops.active?.localName(appContext)
-                        ?: bluetoothAdapter?.name
-                }.getOrNull(),
+                fallbackCarHopName = carBluetoothRadioName(),
             )
             debugLog("wireless radio name=$radioName")
             val identification = config.identification.copy(
@@ -2540,6 +2537,24 @@ class CarPlayController(
      * get from being late — the hotspot and the advertisement took tens of seconds before it was asked —
      * and taking that away without a retry would trade a slow failure for a wrong one.
      */
+    /**
+     * Resolve the radio name from the same Bluetooth route selected for this run. Blank vendor
+     * names are treated as absent so a source-only build can still use Android's adapter name.
+     */
+    private fun carBluetoothRadioName(
+        vendorHop: CarBluetoothTransportHop? = CarBluetoothHops.transport,
+    ): String? {
+        val vendorName = runCatching { vendorHop?.localName(appContext) }
+            .getOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+        if (vendorName != null) return vendorName
+        return runCatching { bluetoothAdapter?.name }
+            .getOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
     private fun requireCarHopRadioName() {
         if (config.wirelessBluetoothHop != WirelessBluetoothHop.CAR) return
 
@@ -2551,11 +2566,7 @@ class CarPlayController(
             runCatching { it.applies(appContext) }.getOrDefault(false)
         }
         repeat(RADIO_NAME_ATTEMPTS) { attempt ->
-            val name = (if (vendorHop != null) {
-                runCatching { vendorHop.localName(appContext) }.getOrNull()
-            } else {
-                runCatching { bluetoothAdapter?.name }.getOrNull()
-            })?.trim()?.takeIf { it.isNotEmpty() }
+            val name = carBluetoothRadioName(vendorHop)
             if (name != null) {
                 debugLog(
                     "wireless radio name (before the hotspot) =$name " +

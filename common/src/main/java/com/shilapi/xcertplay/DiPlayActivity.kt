@@ -2064,6 +2064,12 @@ class DiPlayActivity : ComponentActivity() {
     @Volatile private var connectAfterSync = false
 
     private fun requestWirelessSync(reason: WirelessSyncReason) {
+        // This product profile has no wireless transport. Old saved preferences must never
+        // cause an app-start hotspot transition or a background radio change.
+        if (wiredOnlyProfile) {
+            DiagLog.i(TAG_CAR_HOTSPOT, "wireless sync skipped: wired-only E01 profile")
+            return
+        }
         if (sessionBlocksRadioChange(CarPlayBackgroundSession.hasSession())) return
         val wirelessEnabled = AirPlayPersistence.loadWirelessEnabled(applicationContext)
         val mode = AirPlayPersistence.loadWirelessHotspotMode(applicationContext)
@@ -2215,6 +2221,7 @@ class DiPlayActivity : ComponentActivity() {
      * off would otherwise find out by failing to connect.
      */
     private fun startVendorHopInBackground() {
+        if (wiredOnlyProfile) return
         val hop = vendorHop(this) ?: return
         if (hopStartInFlight) return
         hopStartInFlight = true

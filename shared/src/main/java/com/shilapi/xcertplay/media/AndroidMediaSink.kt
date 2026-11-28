@@ -197,7 +197,7 @@ class AndroidMediaSink(    surface: Surface? = null,
      * driver is looking at, and the cluster layer is the extra one.
      */
     private fun deliverToObserver(type: Int, bytes: ByteArray) {
-        if (type != SCREEN_TYPE_MAIN) return
+        if (type != SCREEN_TYPE_MAIN || mainVideoObserver == null) return
         synchronized(observerLock) {
             val observer = mainVideoObserver ?: return
             invokeObserver(observer, type, bytes)

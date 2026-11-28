@@ -51,6 +51,7 @@ jobs:
             shared/build/reports/tests/
             common/build/reports/tests/
             mobile/build/reports/lint-results-debug.html
+            mobile/build/reports/lint-results-debug.sarif
       - name: Source-only debug APK (compile check only; not for vehicle installation)
         if: success()
         uses: actions/upload-artifact@v4

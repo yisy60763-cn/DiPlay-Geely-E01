@@ -16,12 +16,13 @@ object VideoCodecConfigLog {
 
     /**
      * `profile_idc` of an avcC record, or the HEVC general profile bits, or -1 when the bytes are
-     * not a configuration record we recognise.
+     * not a version-1 configuration record we recognise.
      */
-    private fun profile(codec: VideoCodec, codecData: ByteArray): Int = when {
-        codecData.size < 2 -> -1
-        codec == VideoCodec.H264 && codecData[0].toInt() == 1 -> codecData[1].toInt() and 0xFF
-        codec == VideoCodec.H265 -> codecData[1].toInt() and 0x1F
-        else -> -1
+    private fun profile(codec: VideoCodec, codecData: ByteArray): Int {
+        if (codecData.size < 2 || codecData[0].toInt() != 1) return -1
+        return when (codec) {
+            VideoCodec.H264 -> codecData[1].toInt() and 0xFF
+            VideoCodec.H265 -> codecData[1].toInt() and 0x1F
+        }
     }
 }

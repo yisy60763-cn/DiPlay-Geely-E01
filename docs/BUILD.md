@@ -10,7 +10,7 @@ The standard `mobile` application has `minSdk 19` and packages ARM64 and ARMv7 l
 ./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :mobile:lintDebug :mobile:assembleDebug
 ```
 
-The resulting source-only APK contains no accessory identity, no car hop and no log-upload key. It is what CI builds and it is not a package to install. Tests generate synthetic identities at runtime; no test private-key files are tracked.
+The resulting source-only APK contains no accessory identity, no vendor hop and no log-upload key. It is what CI builds: a compile/test artifact, not a vehicle-ready CarPlay package. With no vendor hop, the `CAR` route selects `AndroidIap2BluetoothLink`; that does not by itself prove the E01 Bluetooth stack can complete iAP2 or a full CarPlay session. Tests generate synthetic identities at runtime; no test private-key files are tracked.
 
 ## Build inputs
 
@@ -55,8 +55,10 @@ DIPLAY_VENDOR_HOP_DIR=/absolute/path/to/the/car-hop scripts/package-geely.sh loc
 | same-network Wi-Fi mode | offered | offered |
 | file | `dist/DiPlay-Legacy-Geely-V<nnn>.apk` | `dist/DiPlay-Legacy-Geely-V<nnn>-local.apk` |
 
-Both carry the car hop and the accessory identity, both are release builds, and both use the same
+Both carry the explicitly supplied accessory identity, both are release builds, and both use the same
 application id and the same signing key — so either installs over the other and its settings are kept.
+The vendor hop is included only when `-PvendorHopDir` is supplied; otherwise the native `CAR` route
+uses `AndroidIap2BluetoothLink`.
 They are one version: `versionCode` and `versionName` do not differ between them, and neither does the
 package name.
 
@@ -69,21 +71,23 @@ Signing comes from `~/.diplay-signing/keystore.properties`, which the script sou
 `ANDROID_*` environment directly. Never commit these values or the keystore. Different signing keys
 cannot update an existing installation.
 
-Neither package is built without the hop: `:mobile:assembleStandaloneRelease` fails rather than make
-one, because a hop-less package runs the AOSP stack, installs, opens, and connects to nothing.
+A vendor hop is optional: `:mobile:assembleStandaloneRelease` can build without it. In that case,
+`CarPlayController` uses `AndroidIap2BluetoothLink` for the `CAR` route. A successful build does not
+prove that the E01 Bluetooth stack can complete iAP2 or that CarPlay authentication will succeed;
+those still require authorized identity material and physical-device validation.
 
 The adapter stack (`-PadapterDir`) is not in either package. It still mounts into the build by hand for
 a run that means to have it, and nothing in the build asks for it.
 
 Before delivery, verify in the APK that `assets/offline-mfi/identity.pk8` and `certificate.p7b` match
-the selected local inputs, and that `assets/payload/` holds the car hop's payloads. Update an existing
+the selected local inputs, and, only when a vendor hop was selected, that `assets/payload/` holds its payloads. Update an existing
 installation without uninstalling it to preserve its settings.
 
 ## Publishing
 
 `scripts/publish-apk.sh` puts the official package on GitHub as a Release, with a SHA-256 checksum. It
-runs here and not in CI: the hop is in a private repository that a CI checkout cannot reach, so a
-workflow building from a checkout could only ever have published a hop-less package. The script refuses
+runs here and not in CI: release signing material and accessory identity are local inputs and are not
+available to a public CI checkout. The script refuses
 to publish anything but the official package, and refuses an APK that carries a log-upload key.
 
 The public release source archive corresponds to the tagged source and excludes runtime identities,

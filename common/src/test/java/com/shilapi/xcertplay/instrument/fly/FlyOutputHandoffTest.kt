@@ -128,6 +128,36 @@ class FlyOutputHandoffTest {
         assertEquals(false, completed)
     }
 
+    @Test fun exhaustedRestoreCanRecoverOnLaterEndCall() {
+        var attempts = 0
+        var firstDone = false
+        var secondDone = false
+        var closed = false
+        val centerSurface = newCenter()
+        val handoff = FlyOutputHandoff(
+            replaceOutput = { surface, applied ->
+                if (surface == null) applied(true)
+                else if (surface === centerSurface) {
+                    attempts++
+                    applied(attempts > 3)
+                } else applied(true)
+            },
+            openMirror = { _, _, onTexture, _ -> onTexture(surface("texture")) },
+            closeMirror = { closed = true },
+        )
+        handoff.begin(centerSurface, surface("cluster"), onReady = {}, onFailed = {})
+        handoff.end { firstDone = true }
+        assertEquals(3, attempts)
+        assertEquals(false, firstDone)
+        assertEquals(false, closed)
+
+        handoff.end { secondDone = true }
+        assertEquals(4, attempts)
+        assertEquals(true, closed)
+        assertEquals(true, firstDone)
+        assertEquals(true, secondDone)
+    }
+
     private fun newCenter(): Surface = surface("center").also { center = it }
 
     private fun surface(name: String) = Surface(android.graphics.SurfaceTexture(name.hashCode()))

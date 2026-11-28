@@ -27,8 +27,10 @@ internal class VideoReferenceChain {
 
 /** Limit latency and memory without ever dropping a reference frame silently. */
 internal class VideoDecodeQueue(
-    // Wi-Fi delivers frames in bursts after a radio gap; the decoder's 250 ms age check bounds latency.
-    private val maxFrames: Int = 60,
+    // E01 wired-only profile: keep the frame queue short to bound latency and native heap pressure.
+    // The byte budget remains generous enough for a large keyframe; age-based recovery is enforced
+    // by VideoDecoder independently, so this is a second, memory-oriented guard.
+    private val maxFrames: Int = 16,
     private val maxBytes: Int = 8 * 1024 * 1024,
 ) {
     private val jobs = LinkedBlockingQueue<VideoJob>()

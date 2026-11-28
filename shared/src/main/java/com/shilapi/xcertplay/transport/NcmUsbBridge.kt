@@ -244,11 +244,13 @@ class NcmUsbBridge internal constructor(
             val blockLength = readU16(buffered, 8)
             if (blockLength < 28) throw failSession(DisconnectOrigin.NCM_NTB_CORRUPT, "Invalid NTB16 block length $blockLength")
             val padded = blockLength % USB_PACKET_SIZE == 0
-            val wireLength = blockLength + if (padded) 1 else 0
-            if (bufferedSize < wireLength) return
-            if (padded && buffered[blockLength].toInt() != 0) {
-                throw failSession(DisconnectOrigin.NCM_NTB_CORRUPT, "Invalid NTB16 short-packet pad")
-            }
+            // USB short-packet padding is a transfer-boundary detail, not an NTB boundary.
+            // The read buffer may coalesce adjacent NTBs, so a non-zero byte after a 512-byte
+            // aligned block is usually the next NTH16 signature ('N'), not malformed padding.
+            val needsPadLookahead = padded
+            if (bufferedSize < blockLength + if (needsPadLookahead) 1 else 0) return
+            val consumePad = padded && buffered[blockLength].toInt() == 0
+            val wireLength = blockLength + if (consumePad) 1 else 0
             for (frame in Ntb16Codec.parse(buffered, 0, blockLength)) enqueueFrame(frame)
             val remaining = bufferedSize - wireLength
             buffered.copyInto(buffered, 0, wireLength, bufferedSize)

@@ -46,6 +46,7 @@ import com.shilapi.xcertplay.network.ManualHotspotManager
 import com.shilapi.xcertplay.network.PortHolders
 import com.shilapi.xcertplay.network.packageNameResolver
 import com.shilapi.xcertplay.carhop.CarBluetoothHops
+import com.shilapi.xcertplay.carhop.CarBluetoothTransportHop
 import com.shilapi.xcertplay.network.WirelessHotspotInfo
 import com.shilapi.xcertplay.network.WirelessHotspotBackend
 import com.shilapi.xcertplay.network.WirelessHotspotManager

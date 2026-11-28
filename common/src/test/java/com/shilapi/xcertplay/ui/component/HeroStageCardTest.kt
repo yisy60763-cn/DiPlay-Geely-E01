@@ -44,6 +44,7 @@ class HeroStageCardTest {
         blocked: Boolean = false,
         mode: Boolean? = null,
         hasUsbHost: Boolean = false,
+        wiredOnly: Boolean = false,
     ): HeroStageCard = HeroStageCard(
         context = context,
         palette = palette,
@@ -60,6 +61,7 @@ class HeroStageCardTest {
         onDisconnect = {},
         onOpenSettings = {},
         initialConnectionMode = mode,
+        wiredOnly = wiredOnly,
     ).also { it.updateState(phase, null, gaps, blocked) }
 
     @Test
@@ -211,6 +213,16 @@ class HeroStageCardTest {
             "有线该说的是插线",
             context.getString(R.string.connect_your_iphone_with_a_usb_cable) in texts,
         )
+    }
+
+    @Test
+    fun `wired-only profile pins the stage to USB and hides wireless switching`() {
+        val wired = card(SessionPhase.Idle, mode = true, hasUsbHost = true, wiredOnly = true)
+        val labels = buttons(wired).filter { it.visibility == View.VISIBLE }.mapNotNull { it.text?.toString() }
+
+        assertTrue("主按钮必须直接连接 USB", context.getString(R.string.connect_wired) in labels)
+        assertFalse("无线连接入口必须隐藏", context.getString(R.string.connect_wireless) in labels)
+        assertFalse("无线切换入口必须隐藏", context.getString(R.string.switch_to_wireless) in labels)
     }
 
     /** The three labels the main control can carry, so it can be found whatever phase it is in. */

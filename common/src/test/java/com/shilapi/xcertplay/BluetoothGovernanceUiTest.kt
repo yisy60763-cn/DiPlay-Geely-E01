@@ -27,7 +27,10 @@ class BluetoothGovernanceUiTest {
     }
 
     private fun activity(page: String = "settings"): DiPlayActivity =
-        Robolectric.buildActivity(DiPlayActivity::class.java, Intent().putExtra("page", page)).setup().get()
+        Robolectric.buildActivity(
+            DiPlayActivity::class.java,
+            Intent().putExtra("page", page).putExtra(DiPlayActivity.EXTRA_SETTINGS_TAB, "governance"),
+        ).setup().get()
 
     private fun allViews(view: View): List<View> = when (view) {
         is ViewGroup -> (0 until view.childCount).map { view.getChildAt(it) }.flatMap { allViews(it) } + view
@@ -86,31 +89,23 @@ class BluetoothGovernanceUiTest {
     }
 
     @Test
-    fun `home page shows the bluetooth restart row`() {
+    fun `wired-only home page hides bluetooth restart row`() {
         val activity = activity("home")
         val action = allViews(activity.findViewById(android.R.id.content))
             .filterIsInstance<TextView>()
             .firstOrNull { it.text.toString() == activity.getString(R.string.bluetooth_restart_short) }
 
-        assertNotNull("Bluetooth restart row must be on the home page", action)
-        assertTrue(
-            "Row must be enabled when no session is live",
-            (action!!.parent as View).isEnabled,
-        )
+        assertTrue("Bluetooth maintenance is not a home quick action in wired-only mode", action == null)
     }
 
     @Test
-    fun `home bluetooth restart row is disabled during a carplay session`() {
+    fun `wired-only home keeps bluetooth restart row hidden during a session`() {
         setSessionLive(true)
         val activity = activity("home")
         val action = allViews(activity.findViewById(android.R.id.content))
             .filterIsInstance<TextView>()
             .firstOrNull { it.text.toString() == activity.getString(R.string.bluetooth_restart_short) }
 
-        assertNotNull("Bluetooth restart row must be present", action)
-        assertFalse(
-            "Row must be disabled during an active CarPlay session",
-            (action!!.parent as View).isEnabled,
-        )
+        assertTrue("Bluetooth maintenance remains hidden on the wired-only home", action == null)
     }
 }

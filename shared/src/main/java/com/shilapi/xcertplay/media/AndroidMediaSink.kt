@@ -670,22 +670,32 @@ private class VideoDecoder(
     }
 
     private fun logOutputFormat(format: MediaFormat) {
-        report("output format requested=${width}x${height} " +
-            "coded=${format.intOrNull(MediaFormat.KEY_WIDTH)}x${format.intOrNull(MediaFormat.KEY_HEIGHT)} " +
-            "crop=${format.intOrNull("crop-left")},${format.intOrNull("crop-top")}," +
-            "${format.intOrNull("crop-right")},${format.intOrNull("crop-bottom")} " +
-            "stride=${format.intOrNull(MediaFormat.KEY_STRIDE)} slice=${format.intOrNull(MediaFormat.KEY_SLICE_HEIGHT)} " +
-            "color=${format.intOrNull(MediaFormat.KEY_COLOR_STANDARD)}/${format.intOrNull(MediaFormat.KEY_COLOR_RANGE)}/${format.intOrNull(MediaFormat.KEY_COLOR_TRANSFER)}")
+        val codedWidth = format.intOrNull(MediaFormat.KEY_WIDTH) ?: width
+        val codedHeight = format.intOrNull(MediaFormat.KEY_HEIGHT) ?: height
+        // Android crop coordinates are inclusive. Report the visible picture size separately from
+        // coded dimensions so a smaller SPS/crop is not mistaken for a full-resolution output.
+        val cropLeft = format.intOrNull("crop-left") ?: 0
+        val cropTop = format.intOrNull("crop-top") ?: 0
+        val cropRight = format.intOrNull("crop-right") ?: (codedWidth - 1)
+        val cropBottom = format.intOrNull("crop-bottom") ?: (codedHeight - 1)
+        val visibleWidth = (cropRight - cropLeft + 1).coerceIn(0, codedWidth)
+        val visibleHeight = (cropBottom - cropTop + 1).coerceIn(0, codedHeight)
+        val colorFormat = format.intOrNull(MediaFormat.KEY_COLOR_FORMAT)
+        val colorStandard = format.intOrNull(MediaFormat.KEY_COLOR_STANDARD)
+        val colorRange = format.intOrNull(MediaFormat.KEY_COLOR_RANGE)
+        val colorTransfer = format.intOrNull(MediaFormat.KEY_COLOR_TRANSFER)
+        val stride = format.intOrNull(MediaFormat.KEY_STRIDE)
+        val sliceHeight = format.intOrNull(MediaFormat.KEY_SLICE_HEIGHT)
+        report("output format requested=${width}x${height} coded=${codedWidth}x${codedHeight} " +
+            "visible=${visibleWidth}x${visibleHeight} crop=${cropLeft},${cropTop},${cropRight},${cropBottom} " +
+            "stride=${stride} slice=${sliceHeight} colorFormat=${colorFormat} " +
+            "color=${colorStandard}/${colorRange}/${colorTransfer}")
         DiagLog.i(
             TAG,
-            "video decoder output format " +
-                "size=${format.intOrNull(MediaFormat.KEY_WIDTH)}x" +
-                "${format.intOrNull(MediaFormat.KEY_HEIGHT)} " +
-                "stride=${format.intOrNull(MediaFormat.KEY_STRIDE)} " +
-                "slice=${format.intOrNull(MediaFormat.KEY_SLICE_HEIGHT)} " +
-                "standard=${format.intOrNull(MediaFormat.KEY_COLOR_STANDARD)} " +
-                "range=${format.intOrNull(MediaFormat.KEY_COLOR_RANGE)} " +
-                "transfer=${format.intOrNull(MediaFormat.KEY_COLOR_TRANSFER)}",
+            "video decoder output format coded=${codedWidth}x${codedHeight} " +
+                "visible=${visibleWidth}x${visibleHeight} colorFormat=${colorFormat} " +
+                "stride=${stride} slice=${sliceHeight} " +
+                "standard=${colorStandard} range=${colorRange} transfer=${colorTransfer}",
         )
     }
 

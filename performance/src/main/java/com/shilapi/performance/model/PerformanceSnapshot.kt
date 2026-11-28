@@ -29,6 +29,7 @@ data class MediaMetrics(
     val shownFps: Float,
     val touchLatencyMs: Long,
     val droppedFrames: Int,
+    val displayRefreshHz: Float = -1f,
 )
 
 data class PerformanceSnapshot(
@@ -79,12 +80,16 @@ data class PerformanceSnapshot(
         get() {
             if (media == null) return "投屏: 待机"
             val touch = if (media.touchLatencyMs >= 0) " · 延迟: ${media.touchLatencyMs}ms" else ""
+            val refresh = if (media.displayRefreshHz > 0f) {
+                String.format(Locale.US, " · 屏幕 %.0fHz", media.displayRefreshHz)
+            } else ""
             return String.format(
                 Locale.US,
-                "视频 FPS: 接收 %.1f / 提交 %.1f%s",
+                "视频 FPS: 接收 %.1f / 提交 %.1f%s%s",
                 media.rxFps,
                 media.shownFps,
                 touch,
+                refresh,
             )
         }
 }

@@ -2695,7 +2695,7 @@ class DiPlayActivity : ComponentActivity() {
 
     private fun connect(wireless: Boolean) {
         if (wiredOnlyProfile && wireless) {
-            DiagLog.w(TAG, "Ignored wireless connect request in wired-only E01 profile")
+            DiagLog.w(TAG_CAR_HOTSPOT, "Ignored wireless connect request in wired-only E01 profile")
             toast(getString(R.string.connect_your_iphone_with_a_usb_cable))
             return
         }

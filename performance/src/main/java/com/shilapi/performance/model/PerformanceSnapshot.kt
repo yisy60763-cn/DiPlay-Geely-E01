@@ -79,6 +79,12 @@ data class PerformanceSnapshot(
         get() {
             if (media == null) return "投屏: 待机"
             val touch = if (media.touchLatencyMs >= 0) " · 延迟: ${media.touchLatencyMs}ms" else ""
-            return String.format(Locale.US, "FPS: %.1f%s", media.shownFps, touch)
+            return String.format(
+                Locale.US,
+                "视频 FPS: 接收 %.1f / 提交 %.1f%s",
+                media.rxFps,
+                media.shownFps,
+                touch,
+            )
         }
 }

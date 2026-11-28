@@ -496,6 +496,18 @@ class ClusterFlyController(
     private fun safetyChanged(block: FlyBlock?) {
         if (block != null) log(ClusterFlyLog.safetyOn(block)) else log(ClusterFlyLog.safetyOff())
         val now = clock()
+        // Pre-arm is a separate IDLE path: it can have sent 1900 and 1887 without
+        // entering the session. Invalidate its queued front step and withdraw that state
+        // immediately when a safety interlock activates.
+        if (block != null && session.currentPhase == FlyPhase.IDLE && preArmed) {
+            generation++
+            val hadFront = preArmedFrontOk
+            preArmed = false
+            preArmedFrontOk = false
+            preArm1900 = FlyChainLog.SKIP
+            preArm1887 = FlyChainLog.SKIP
+            disarmPreArmLocked(now, hadFront)
+        }
         val phaseBefore = session.currentPhase
         val effect = session.onSafety(conditions(now), now)
         handle(effect)

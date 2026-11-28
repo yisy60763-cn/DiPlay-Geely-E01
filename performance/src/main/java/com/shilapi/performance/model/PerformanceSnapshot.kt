@@ -28,7 +28,7 @@ data class MediaMetrics(
     val rxFps: Float,
     val shownFps: Float,
     val touchLatencyMs: Long,
-    val droppedFrames: Int,
+    val recoveries: Int,
     val displayRefreshHz: Float = -1f,
 )
 

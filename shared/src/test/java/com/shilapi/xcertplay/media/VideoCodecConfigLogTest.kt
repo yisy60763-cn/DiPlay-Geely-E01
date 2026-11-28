@@ -39,4 +39,12 @@ class VideoCodecConfigLogTest {
             VideoCodecConfigLog.line(VideoCodec.H264, byteArrayOf(0, 0, 1)),
         )
     }
+
+    @Test
+    fun `a malformed hvcC header says unknown instead of reporting random profile bits`() {
+        assertEquals(
+            "video config codec=H265 profile=-1",
+            VideoCodecConfigLog.line(VideoCodec.H265, byteArrayOf(0, 0x62, 0, 0)),
+        )
+    }
 }

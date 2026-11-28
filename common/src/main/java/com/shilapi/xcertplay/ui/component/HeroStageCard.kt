@@ -49,6 +49,8 @@ class HeroStageCard(
     initialConnectionMode: Boolean? = null,
     /** Called with `true` for wireless and `false` for wired, before the connection starts. */
     private val onModeSelected: ((Boolean) -> Unit)? = null,
+    /** This build exposes only the USB transport. */
+    private val wiredOnly: Boolean = false,
 ) : LinearLayout(context) {
 
     private val pill: TextView
@@ -73,7 +75,7 @@ class HeroStageCard(
     /** The car-hotspot reminder, kept as a field so a wired choice can put it away. */
     private val hotspotNoteView: TextView
 
-    private var currentMode: Boolean? = initialConnectionMode
+    private var currentMode: Boolean? = if (wiredOnly) false else initialConnectionMode
     private var paintedPhase: SessionPhase? = null
     private var paintedMode: Boolean? = null
     private var paintedUsbHost = false
@@ -239,7 +241,7 @@ class HeroStageCard(
         // A wired choice is not a wireless one, and the readiness list the Activity hands in is the
         // wireless route's: "turn on the car's Bluetooth" beside a cable nobody has plugged in is
         // advice for the other transport. The wired line under the emblem says what this one needs.
-        val wirelessRoute = currentMode != false
+        val wirelessRoute = !wiredOnly && currentMode != false
         val gaps = if (wirelessRoute) readinessGaps else null
         val blocked = wirelessRoute && isBlocked
 
@@ -341,8 +343,8 @@ class HeroStageCard(
         mainBtn.alpha = if (idle && !mainBtn.isEnabled) 0.4f else 1f
 
         // Before a choice both are offered; after it, only the one that would switch.
-        wiredBtn.visibility = if (idle && !wiredChosen) View.VISIBLE else View.GONE
-        wirelessBtn.visibility = if (idle && wiredChosen) View.VISIBLE else View.GONE
+        wiredBtn.visibility = if (!wiredOnly && idle && !wiredChosen) View.VISIBLE else View.GONE
+        wirelessBtn.visibility = if (!wiredOnly && idle && wiredChosen) View.VISIBLE else View.GONE
         wiredBtn.text = context.getString(if (choosing) R.string.connect_wired else R.string.switch_to_wired)
         wirelessBtn.text = context.getString(if (choosing) R.string.connect_wireless else R.string.switch_to_wireless)
 
@@ -377,6 +379,7 @@ class HeroStageCard(
      * transport, because that is the only reason to press it.
      */
     private fun chooseMode(mode: Boolean) {
+        if (wiredOnly && mode) return
         if (!mode && !hasUsbHost) return
         if (currentMode == mode) return
         currentMode = mode

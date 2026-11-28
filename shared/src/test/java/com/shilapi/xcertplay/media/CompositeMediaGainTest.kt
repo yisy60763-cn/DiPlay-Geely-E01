@@ -84,4 +84,33 @@ class CompositeMediaGainTest {
         composite.setFocusGain(1.0f)
         assertEquals(1.0f, composite.effectiveGain(), 0.001f)
     }
+    @Test
+    fun `telephony stream mutes media until the call stream ends`() {
+        val composite = CompositeMediaGain(duckFactor = 0.2f)
+
+        composite.onStreamStarted(type = 110, isNavigation = false)
+        assertEquals(1.0f, composite.effectiveGain(), 0.001f)
+
+        composite.onStreamStarted(type = 120, isNavigation = false, isTelephony = true)
+        assertEquals(0.0f, composite.effectiveGain(), 0.001f)
+        assertEquals(1, composite.state().telephonyStreams)
+
+        composite.onStreamStopped(type = 120)
+        assertEquals(1.0f, composite.effectiveGain(), 0.001f)
+        assertEquals(0, composite.state().telephonyStreams)
+    }
+
+    @Test
+    fun `overlapping telephony streams keep media muted until all finish`() {
+        val composite = CompositeMediaGain()
+
+        composite.onStreamStarted(type = 120, isNavigation = false, isTelephony = true)
+        composite.onStreamStarted(type = 121, isNavigation = false, isTelephony = true)
+        composite.onStreamStopped(type = 120)
+
+        assertEquals(0.0f, composite.effectiveGain(), 0.001f)
+        composite.onStreamStopped(type = 121)
+        assertEquals(1.0f, composite.effectiveGain(), 0.001f)
+    }
+
 }

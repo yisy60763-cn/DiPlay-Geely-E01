@@ -76,6 +76,16 @@ class QuickWidgetsViewTest {
         assertTrue(shown.contains(hotspotSettings()))
     }
 
+    @Test
+    fun `wired-only profile hides wireless and bluetooth quick controls`() {
+        val shown = visibleButtons(card(WirelessHotspotMode.MANUAL, wiredOnly = true))
+        assertFalse(shown.contains(context.getString(R.string.built_in_car_hotspot)))
+        assertFalse(shown.contains(context.getString(R.string.same_wifi_network)))
+        assertFalse(shown.contains(hotspotSettings()))
+        assertFalse(shown.contains(wifiSettings()))
+        assertFalse(shown.contains(context.getString(R.string.bluetooth_restart_short)))
+    }
+
     private fun visibleButtons(mode: WirelessHotspotMode): List<String> = visibleButtons(card(mode))
 
     private fun visibleButtons(view: QuickWidgetsView): List<String> {
@@ -84,7 +94,11 @@ class QuickWidgetsViewTest {
         return found
     }
 
-    private fun card(mode: WirelessHotspotMode, sameWifiOffered: Boolean = true): QuickWidgetsView {
+    private fun card(
+        mode: WirelessHotspotMode,
+        sameWifiOffered: Boolean = true,
+        wiredOnly: Boolean = false,
+    ): QuickWidgetsView {
         val view = QuickWidgetsView(
             context,
             palette,
@@ -102,6 +116,7 @@ class QuickWidgetsViewTest {
             onRestartBluetooth = {},
             bluetoothRestartEnabled = true,
             sameWifiOffered = sameWifiOffered,
+            wiredOnly = wiredOnly,
         )
         view.updateState(mode, "Geely-5G", null, "Stream 3", bluetoothRestartEnabled = true)
         return view

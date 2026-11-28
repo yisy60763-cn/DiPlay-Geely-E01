@@ -3,86 +3,46 @@ on:
   push:
     branches: [main, geekplay-e01-improve, wired-only-e01]
   workflow_dispatch:
+
+# New commits supersede older checks on the same branch. This prevents a queue
+# of obsolete builds from delaying the APK for the current source tree.
 concurrency:
   group: android-checks-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
+
 permissions:
   contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
       - name: Reject credential files in public source
         run: python3 scripts/check_public_tree.py
-      - name: Run actions/setup-java@v4
+
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '25'
-      - name: Run android-actions/setup-android@v3
+
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0 ndk;25.2.9519653
+
       - uses: gradle/actions/setup-gradle@v4
+
       - name: Unit tests
-        shell: bash
-        run: |
-          for attempt in 1 2 3; do
-            if ./gradlew --no-configuration-cache :shared:testDebugUnitTest :common:testDebugUnitTest --stacktrace; then
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "Unit tests failed on attempt $attempt; retrying with backoff."
-              sleep $((attempt * 30))
-            fi
-          done
-          echo "Unit tests failed after three attempts."
-          exit 1
-      - name: Lint and source-only debug APK compilation
+        run: ./gradlew --no-configuration-cache :shared:testDebugUnitTest :common:testDebugUnitTest --stacktrace
+
+      - name: Lint and build source-only debug APK
         run: ./gradlew :mobile:lintDebug :mobile:assembleDebug --stacktrace
-      - name: Trace lint dependency origin
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p mobile/build/reports
-          ./gradlew :mobile:dependencies --configuration debugRuntimeClasspath > mobile/build/reports/debugRuntimeClasspath.txt || true
-          report=mobile/build/reports/lint-results-debug.sarif
-          output=mobile/build/reports/lint-transform-origin.txt
-          if [ -f "$report" ]; then
-            hash=$(python3 -c 'import json; d=json.load(open("'"$report"'")); print(next((x["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].split("/transforms/")[1].split("/")[0] for r in d.get("runs",[]) for x in r.get("results",[]) if x.get("ruleId")=="TrustAllX509TrustManager"), ""))')
-            if [ -n "$hash" ]; then
-              dir="$HOME/.gradle/caches/9.5.0/transforms/$hash"
-              echo "SARIF transform hash: $hash" > "$output"
-              if [ -d "$dir" ]; then
-                find "$dir" -maxdepth 6 -type f -print >> "$output"
-                while IFS= read -r file; do
-                  echo "--- strings: $file" >> "$output"
-                  strings "$file" 2>/dev/null | grep -Ei 'bouncycastle|conscrypt|jmdns|libaums|androidx|group|module|artifact|version' | head -100 >> "$output" || true
-                done < <(find "$dir" -maxdepth 6 -type f)
-              else
-                echo "Transform directory not found: $dir" >> "$output"
-              fi
-            else
-              echo "No TrustAllX509TrustManager result in SARIF" > "$output"
-            fi
-          else
-            echo "Lint SARIF not generated" > "$output"
-          fi
-      - name: Test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports
-          path: |
-            shared/build/reports/tests/
-            common/build/reports/tests/
-            mobile/build/reports/lint-results-debug.html
-            mobile/build/reports/lint-results-debug.sarif
-            mobile/build/reports/debugRuntimeClasspath.txt
-            mobile/build/reports/lint-transform-origin.txt
-      - name: Source-only debug APK (compile check only; not for vehicle installation)
+
+      - name: Upload source-only debug APK (compile check only; not for vehicle installation)
         if: success()
         uses: actions/upload-artifact@v4
         with:

@@ -85,7 +85,9 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
                 stats.reading()
                 if (!readFully(input, headerBuffer, HEADER_LEN)) break
                 val bodySize = readU32Le(headerBuffer, 0)
-                if (bodySize > MAX_BODY) break
+                // The wire field is unsigned u32, while Kotlin Int is signed. Reject values
+                // with the high bit set before they can become a negative ByteArray size.
+                if (!isValidBodySize(bodySize)) break
                 val body = if (bodySize <= MAX_REUSED_BODY_BYTES) {
                     if (bodyBuffer.size < bodySize) bodyBuffer = ByteArray(bodySize)
                     bodyBuffer
@@ -186,6 +188,8 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
          * the life of the stream.
          */
         const val MAX_REUSED_BODY_BYTES = 1024 * 1024
+
+        internal fun isValidBodySize(bodySize: Int): Boolean = bodySize in 0..MAX_BODY
     }
 }
 

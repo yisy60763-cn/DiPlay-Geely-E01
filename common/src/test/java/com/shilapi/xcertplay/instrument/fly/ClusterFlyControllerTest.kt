@@ -869,4 +869,24 @@ class ClusterFlyControllerTest {
         closeCallbacks.first { it.first == 2_000L }.second()
         assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
     }
+
+    @Test
+    fun `radar withdraws prearmed navigation and cancels queued front`() {
+        val controller = controller()
+        controller.onCarPlayStarted()
+        assertEquals(listOf(FlyCommand.NAV_ON, FlyCommand.NAV_MODE_ON), sent)
+        assertTrue(scheduled.isNotEmpty())
+
+        controller.onRadar(true)
+        assertFalse(sent.contains(FlyCommand.NAV_FRONT))
+        assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
+        assertTrue(sent.contains(FlyCommand.NAV_OFF))
+
+        // The pre-arm front timer is invalidated; the withdrawal back step is the only delayed MCU step.
+        now = 2_000L
+        runScheduled()
+        assertFalse(sent.contains(FlyCommand.NAV_FRONT))
+        assertTrue(sent.contains(FlyCommand.NAV_BACK))
+        assertEquals(FlyPhase.IDLE, controller.phase)
+    }
 }

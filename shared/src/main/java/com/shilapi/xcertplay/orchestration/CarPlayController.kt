@@ -1584,7 +1584,10 @@ class CarPlayController(
             val radioName = WirelessIdentityResolver.resolveRadioName(
                 link = link,
                 hopType = config.wirelessBluetoothHop,
-                fallbackCarHopName = CarBluetoothHops.active?.localName(appContext),
+                fallbackCarHopName = runCatching {
+                    CarBluetoothHops.active?.localName(appContext)
+                        ?: bluetoothAdapter?.name
+                }.getOrNull(),
             )
             debugLog("wireless radio name=$radioName")
             val identification = config.identification.copy(

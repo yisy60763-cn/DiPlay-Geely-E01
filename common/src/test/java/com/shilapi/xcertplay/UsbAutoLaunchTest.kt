@@ -27,4 +27,12 @@ class UsbAutoLaunchTest {
         // An attach event without a device payload is malformed and must be ignored.
         assertFalse(UsbAutoLaunch.isAppleAttach(Intent(UsbManager.ACTION_USB_DEVICE_ATTACHED)))
     }
+
+    @Test
+    fun detachEventsAreSeparateFromAttachEvents() {
+        assertFalse(UsbAutoLaunch.isAppleDetach(Intent(Intent.ACTION_MAIN)))
+        assertFalse(UsbAutoLaunch.isAppleDetach(Intent(UsbManager.ACTION_USB_DEVICE_ATTACHED)))
+        // A malformed detach must not cancel a valid pending connection.
+        assertFalse(UsbAutoLaunch.isAppleDetach(Intent(UsbManager.ACTION_USB_DEVICE_DETACHED)))
+    }
 }

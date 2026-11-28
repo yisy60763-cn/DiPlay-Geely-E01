@@ -188,6 +188,7 @@ class DiPlayActivity : ComponentActivity() {
     private var carLifeInProgress = false
     private var bluetoothRestartInProgress = false
     private var initialLaunch = true
+    private var usbAutoConnectScheduled = false
     private var notificationTransport = true
     private var exportInProgress = false
     private var browseGeneration = 0
@@ -260,7 +261,7 @@ class DiPlayActivity : ComponentActivity() {
      * whether or not the user asked for anything.
      */
     private val usbTopology = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = onUsbTopologyChanged()
+        override fun onReceive(context: Context, intent: Intent) = onUsbTopologyChanged(intent)
     }
 
     /**
@@ -364,6 +365,7 @@ class DiPlayActivity : ComponentActivity() {
         })
         PerfTrace.mark("startup", "startup/create-done")
         reportFirstDraw()
+        if (UsbAutoLaunch.isAppleAttach(intent)) scheduleUsbAutoConnect("USB attach launch")
     }
 
     /**
@@ -397,6 +399,10 @@ class DiPlayActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent); setIntent(intent)
+        if (UsbAutoLaunch.isAppleAttach(intent)) {
+            scheduleUsbAutoConnect("USB attach while DiPlay is already open")
+            return
+        }
         // A second tap on the app icon arrives here carrying the launcher's intent, which names no
         // page — so the default would take the driver off the firmware page while a script is writing
         // to `/system`, and the back key would stop being swallowed with it. The watch would put them
@@ -3128,12 +3134,36 @@ class DiPlayActivity : ComponentActivity() {
      * Plugging the adapter in puts its step line on the page; pulling it out takes the line away. Only a change
      * of presence redraws, so this cannot become the redraw loop the per-second bus read used to be.
      */
-    private fun onUsbTopologyChanged() {
+    private fun onUsbTopologyChanged(intent: Intent) {
+        if (UsbAutoLaunch.isAppleAttach(intent)) {
+            scheduleUsbAutoConnect("Apple USB device attached")
+            return
+        }
         if (!externalBluetoothSelected()) return
         val plugged = AdapterRoutes.active?.present(this) == true
         if (plugged == adapterPluggedSeen) return
         adapterPluggedSeen = plugged
         if (page == "home") render()
+    }
+
+    /**
+     * A real Apple USB attach is an explicit request to start the wired-only CarPlay flow.
+     * Debounce duplicate system broadcasts and reuse the normal connect path so notification,
+     * VPN and microphone prerequisites are still handled in their existing order.
+     */
+    private fun scheduleUsbAutoConnect(reason: String) {
+        if (usbAutoConnectScheduled) return
+        usbAutoConnectScheduled = true
+        DiagLog.i("UsbAutoLaunch", "$reason; scheduling wired CarPlay startup")
+        handler.postDelayed({
+            usbAutoConnectScheduled = false
+            if (isFinishing || (Build.VERSION.SDK_INT >= 17 && isDestroyed)) return@postDelayed
+            if (CarPlayBackgroundSession.hasSession()) {
+                openProjection()
+            } else {
+                connect(wireless = false)
+            }
+        }, USB_AUTO_CONNECT_DEBOUNCE_MS)
     }
 
     @android.annotation.SuppressLint("MissingPermission")
@@ -4259,6 +4289,7 @@ class DiPlayActivity : ComponentActivity() {
     private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)) }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     companion object {
+        private const val USB_AUTO_CONNECT_DEBOUNCE_MS = 650L
         const val EXTRA_SETTINGS_TAB = "settings_tab"
         private const val KEY_SETTINGS_TAB = "key_settings_tab"
 

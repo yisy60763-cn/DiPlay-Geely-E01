@@ -686,17 +686,22 @@ private class VideoDecoder(
         val colorTransfer = format.intOrNull(MediaFormat.KEY_COLOR_TRANSFER)
         val stride = format.intOrNull(MediaFormat.KEY_STRIDE)
         val sliceHeight = format.intOrNull(MediaFormat.KEY_SLICE_HEIGHT)
-        report("output format requested=${width}x${height} coded=${codedWidth}x${codedHeight} " +
-            "visible=${visibleWidth}x${visibleHeight} crop=${cropLeft},${cropTop},${cropRight},${cropBottom} " +
+        val visibleMatchesRequest = visibleWidth == width && visibleHeight == height
+        val qualityStatus = if (visibleMatchesRequest) "full-visible-size" else "visible-size-mismatch"
+        val summary = "video decoder output format requested=${width}x${height} " +
+            "coded=${codedWidth}x${codedHeight} visible=${visibleWidth}x${visibleHeight} " +
+            "crop=${cropLeft},${cropTop},${cropRight},${cropBottom} " +
             "stride=${stride} slice=${sliceHeight} colorFormat=${colorFormat} " +
-            "color=${colorStandard}/${colorRange}/${colorTransfer}")
-        DiagLog.i(
-            TAG,
-            "video decoder output format coded=${codedWidth}x${codedHeight} " +
-                "visible=${visibleWidth}x${visibleHeight} colorFormat=${colorFormat} " +
-                "stride=${stride} slice=${sliceHeight} " +
-                "standard=${colorStandard} range=${colorRange} transfer=${colorTransfer}",
-        )
+            "standard=${colorStandard} range=${colorRange} transfer=${colorTransfer} " +
+            "quality=${qualityStatus}"
+        report(summary)
+        if (visibleMatchesRequest) {
+            DiagLog.i(TAG, summary)
+        } else {
+            // Keep playback running: the discrepancy is diagnostic, not proof of a decoder fault.
+            DiagLog.w(TAG, summary)
+            report("picture detail warning: decoder visible size differs from negotiated CarPlay size")
+        }
     }
 
     @Synchronized

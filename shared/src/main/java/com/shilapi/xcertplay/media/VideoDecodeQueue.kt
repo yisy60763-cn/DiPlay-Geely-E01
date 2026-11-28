@@ -28,9 +28,10 @@ internal class VideoReferenceChain {
 /** Limit latency and memory without ever dropping a reference frame silently. */
 internal class VideoDecodeQueue(
     // E01 wired-only profile: keep the frame queue short to bound latency and native heap pressure.
-    // The byte budget remains generous enough for a large keyframe; age-based recovery is enforced
+    // Eight queued frames cap the decoder backlog; the byte budget remains generous enough for a large keyframe.
+    // Age-based recovery is enforced
     // by VideoDecoder independently, so this is a second, memory-oriented guard.
-    private val maxFrames: Int = 16,
+    private val maxFrames: Int = 8,
     private val maxBytes: Int = 8 * 1024 * 1024,
 ) {
     private val jobs = LinkedBlockingQueue<VideoJob>()

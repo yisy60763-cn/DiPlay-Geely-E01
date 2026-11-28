@@ -204,8 +204,11 @@ object MediaCodecSupport {
         if (2 + headerBytes > rtpPayload.size) return ByteArray(0)
         val auSize = (readU16Be(rtpPayload, 2) shr 3) and 0x1fff
         val start = 2 + headerBytes
-        val end = minOf(start + auSize, rtpPayload.size)
-        return if (end <= start) ByteArray(0) else rtpPayload.copyOfRange(start, end)
+        // AU-size is expressed in bits. Do not pass a truncated access unit to MediaCodec:
+        // a short packet is corruption, not a valid shorter AAC frame.
+        if (auSize == 0 || auSize > rtpPayload.size - start) return ByteArray(0)
+        val end = start + auSize
+        return rtpPayload.copyOfRange(start, end)
     }
 
     /** MPEG-4 sampling frequency index used by both ADTS and AudioSpecificConfig. */

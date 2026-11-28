@@ -353,7 +353,15 @@ class IphoneUsbHost(
             appContext,
             0,
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    // UsbManager fills EXTRA_DEVICE and EXTRA_PERMISSION_GRANTED into this
+                    // broadcast. Android 12+ requires a mutable PendingIntent for those extras.
+                    PendingIntent.FLAG_MUTABLE
+                } else {
+                    // FLAG_IMMUTABLE does not exist on the Android 5.1 target (API 22).
+                    0
+                },
         )
     }
 

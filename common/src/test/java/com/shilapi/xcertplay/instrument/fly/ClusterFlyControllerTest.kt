@@ -886,6 +886,8 @@ class ClusterFlyControllerTest {
         now = 2_000L
         runScheduled()
         assertFalse(sent.contains(FlyCommand.NAV_FRONT))
+        now = 3_000L
+        runScheduled()
         assertTrue(sent.contains(FlyCommand.NAV_BACK))
         assertEquals(FlyPhase.IDLE, controller.phase)
     }

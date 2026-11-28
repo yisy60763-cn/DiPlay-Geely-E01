@@ -100,7 +100,7 @@ class PerformanceMonitorTest {
                     rxFps = 60f,
                     shownFps = 60f,
                     touchLatencyMs = 25L,
-                    droppedFrames = 0,
+                    recoveries = 0,
                 )
             },
         ) {

@@ -462,6 +462,9 @@ private class VideoDecoder(
         }
         val codec = config.codec
         val codecData = config.codecData
+        val codecProfile = VideoCodecConfigLog.line(codec, codecData) + " configBytes=${codecData.size}"
+        DiagLog.i(TAG, codecProfile)
+        report(codecProfile)
         val format = MediaFormat.createVideoFormat(mime, width, height).apply {
             setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, MAX_INPUT_SIZE)
             setInteger(MediaFormat.KEY_PRIORITY, 0)

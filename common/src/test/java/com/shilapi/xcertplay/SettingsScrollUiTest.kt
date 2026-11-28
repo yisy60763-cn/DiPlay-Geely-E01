@@ -32,7 +32,7 @@ class SettingsScrollUiTest {
     @Test fun repaintingAPageComesBackToWhereTheDriverWas() {
         val controller = Robolectric.buildActivity(
             DiPlayActivity::class.java,
-            Intent().putExtra("page", "settings"),
+            Intent().putExtra("page", "settings").putExtra(DiPlayActivity.EXTRA_SETTINGS_TAB, "system"),
         ).setup()
         val activity = controller.get()
         try {

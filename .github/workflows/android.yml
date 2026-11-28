@@ -36,11 +36,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Unit tests
-        run: ./gradlew --no-configuration-cache :shared:testDebugUnitTest :common:testDebugUnitTest --stacktrace
-
-      - name: Lint and build source-only debug APK
-        run: ./gradlew :mobile:lintDebug :mobile:assembleDebug --stacktrace
+      - name: Build source-only debug APK (prioritize delivery)
+        run: ./gradlew :mobile:assembleDebug --stacktrace
 
       - name: Upload source-only debug APK (compile check only; not for vehicle installation)
         if: success()

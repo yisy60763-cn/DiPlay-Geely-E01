@@ -93,6 +93,8 @@ class DiPlayActivity : ComponentActivity() {
     private val handler = Handler(Looper.getMainLooper())
     /** The pages this build still has. Everything else is the home page — see [render]. */
     private val KNOWN_PAGES = setOf("home", "display", "system", "settings", "about", PAGE_FIRMWARE)
+    /** This E01 build is deliberately single-user and USB-wired only. */ 
+    private val wiredOnlyProfile = true
 
     private var page = "home"
     /**
@@ -646,14 +648,14 @@ class DiPlayActivity : ComponentActivity() {
             pairedPhoneName = DiPlayPreferences.phoneName(this),
             hasUsbHost = UsableConnection.USB in connectionReport().usable,
             setupError = setupError,
-            supportedConnectionView = supportedConnectionLabel(),
-            adapterStatusView = adapterStatusView(),
-            hotspotOffNote = if (deviceSupportsWireless() && carHotspotOff()) {
+            supportedConnectionView = if (wiredOnlyProfile) null else supportedConnectionLabel(),
+            adapterStatusView = if (wiredOnlyProfile) null else adapterStatusView(),
+            hotspotOffNote = if (!wiredOnlyProfile && deviceSupportsWireless() && carHotspotOff()) {
                 getString(R.string.msg_car_hotspot_off, hotspotSsid())
             } else {
                 null
             },
-            onConnectWireless = { connect(true) },
+            onConnectWireless = { if (!wiredOnlyProfile) connect(true) },
             onConnectUsb = { connect(false) },
             onOpenProjection = { openProjection() },
             onDisconnect = {
@@ -667,16 +669,17 @@ class DiPlayActivity : ComponentActivity() {
                 }
             },
             onOpenSettings = { openSettings(SettingsTab.CONNECTION) },
-            initialConnectionMode = AirPlayPersistence.loadConnectionMode(this),
+            initialConnectionMode = if (wiredOnlyProfile) false else AirPlayPersistence.loadConnectionMode(this),
             // Remember the choice, and nothing else: the card repaints itself in place, and the tap
             // that made this choice is already starting a connection — rebuilding the page here
             // would throw away the tree the driver is looking at and then paint the same state again.
             onModeSelected = { mode ->
-                AirPlayPersistence.saveWirelessEnabled(this, mode)
-                if (mode) {
-                    requestWirelessSync(WirelessSyncReason.MODE_SWITCH)
+                if (!wiredOnlyProfile) {
+                    AirPlayPersistence.saveWirelessEnabled(this, mode)
+                    if (mode) requestWirelessSync(WirelessSyncReason.MODE_SWITCH)
                 }
             },
+            wiredOnly = wiredOnlyProfile,
         )
         hero = stageCard
 
@@ -705,7 +708,8 @@ class DiPlayActivity : ComponentActivity() {
             onOpenDrawer = { openSettings(SettingsTab.CONNECTION) },
             onRestartBluetooth = { confirmBluetoothRestart() },
             bluetoothRestartEnabled = !CarPlayBackgroundSession.hasSession() && !bluetoothRestartInProgress,
-            sameWifiOffered = WirelessHotspotMode.EXISTING_WIFI in connectionReport().wirelessModes,
+            sameWifiOffered = !wiredOnlyProfile && WirelessHotspotMode.EXISTING_WIFI in connectionReport().wirelessModes,
+            wiredOnly = wiredOnlyProfile,
         )
         widgets = quick
 
@@ -769,16 +773,18 @@ class DiPlayActivity : ComponentActivity() {
             },
             buildConnectionSection = { col ->
                 val columns = CardColumns(col)
-                val readiness = pageState().readiness
-                if (!hasWirelessRadio()) {
-                    columns.line(
-                        label(getString(R.string.this_head_unit_is_not_supported_for_wireless_carplay), 16, WARNING)
-                            .apply { setPadding(0, 0, 0, dp(8)) },
-                    )
+                if (!wiredOnlyProfile) {
+                    val readiness = pageState().readiness
+                    if (!hasWirelessRadio()) {
+                        columns.line(
+                            label(getString(R.string.this_head_unit_is_not_supported_for_wireless_carplay), 16, WARNING)
+                                .apply { setPadding(0, 0, 0, dp(8)) },
+                        )
+                    }
+                    if (wirelessBlocked && readiness.blocking.isNotEmpty()) gapsCard(columns.raw(), readiness)
+                    bucket(columns, R.string.wireless_settings, R.string.set_up_once_your_details_stay_saved_for_the_next_drive_cha)
+                    wirelessCards(columns, readiness)
                 }
-                if (wirelessBlocked && readiness.blocking.isNotEmpty()) gapsCard(columns.raw(), readiness)
-                bucket(columns, R.string.wireless_settings, R.string.set_up_once_your_details_stay_saved_for_the_next_drive_cha)
-                wirelessCards(columns, readiness)
                 bucket(columns, R.string.wired_settings, R.string.wired_settings_hint)
                 wiredCards(columns)
             },
@@ -975,25 +981,19 @@ class DiPlayActivity : ComponentActivity() {
         val columns = CardColumns(content)
         columns.line(label(getString(R.string.your_drive_your_way), 34, TEXT, true))
         columns.line(label(getString(R.string.settings_hint), 17, MUTED).apply { setPadding(0, dp(8), 0, dp(8)) })
-        columns.line(supportedConnectionLabel().apply { setPadding(0, 0, 0, dp(8)) })
-        if (!hasWirelessRadio()) {
-            columns.line(
-                label(getString(R.string.this_head_unit_is_not_supported_for_wireless_carplay), 16, WARNING)
-                    .apply { setPadding(0, 0, 0, dp(8)) },
-            )
+        if (!wiredOnlyProfile) {
+            columns.line(supportedConnectionLabel().apply { setPadding(0, 0, 0, dp(8)) })
+            if (!hasWirelessRadio()) {
+                columns.line(
+                    label(getString(R.string.this_head_unit_is_not_supported_for_wireless_carplay), 16, WARNING)
+                        .apply { setPadding(0, 0, 0, dp(8)) },
+                )
+            }
+            val readiness = pageState().readiness
+            if (wirelessBlocked && readiness.blocking.isNotEmpty()) gapsCard(columns.raw(), readiness)
+            bucket(columns, R.string.wireless_settings, R.string.set_up_once_your_details_stay_saved_for_the_next_drive_cha)
+            wirelessCards(columns, readiness)
         }
-        // One readiness for the whole page, read once so the cards and the connect step cannot disagree.
-        val readiness = pageState().readiness
-        // A notice is not "not ready": this card exists for the attempt that was refused, so it
-        // appears only while something actually blocks. The lines a notice carries are on the
-        // connection card, with the controls they belong to.
-        if (wirelessBlocked && readiness.blocking.isNotEmpty()) gapsCard(columns.raw(), readiness)
-
-        bucket(columns, R.string.wireless_settings, R.string.set_up_once_your_details_stay_saved_for_the_next_drive_cha)
-        wirelessCards(columns, readiness)
-
-        // The heading and its hint are drawn wherever the bucket is, exactly as on the bucket's own
-        // route: what is conditional is the card, and [wiredCards] is where that is decided.
         bucket(columns, R.string.wired_settings, R.string.wired_settings_hint)
         wiredCards(columns)
 
@@ -2694,6 +2694,11 @@ class DiPlayActivity : ComponentActivity() {
     }
 
     private fun connect(wireless: Boolean) {
+        if (wiredOnlyProfile && wireless) {
+            DiagLog.w(TAG, "Ignored wireless connect request in wired-only E01 profile")
+            toast(getString(R.string.connect_your_iphone_with_a_usb_cable))
+            return
+        }
         // A session must not start while the hop is changing the head unit: it would be built on a
         // socket that is about to move, and the operation would unwind underneath it. Checked before
         // anything else, because none of the gaps below are the reason to refuse this time.

@@ -2054,6 +2054,10 @@ class CarPlayController(
     private fun startIphone() {
         wiredBringUpGeneration.incrementAndGet()
         availabilityPollGeneration.incrementAndGet()
+        // A permission poll belongs to the USB device instance it was started for. In particular,
+        // a detach while waiting for permission restarts discovery; invalidate the old poll so its
+        // timeout cannot fail the new search after the phone has already left the bus.
+        permissionPollGeneration++
         phase = Phase.IPHONE
         reenumerationAttempts = 0
         // A new search gets a fresh verdict. The detach counters are not reset here: this runs on a

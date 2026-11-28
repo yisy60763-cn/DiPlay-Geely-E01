@@ -106,13 +106,13 @@ class VideoDecodeQueueTest {
         assertNull(queue.poll(0))
     }
 
-    @Test fun defaultWiredQueueCapsBacklogAtSixteenFrames() {
+    @Test fun defaultWiredQueueCapsBacklogAtEightFrames() {
         val queue = VideoDecodeQueue()
-        repeat(16) { queue.offer(VideoJob.Frame(byteArrayOf(it.toByte()))) }
-        queue.offer(VideoJob.Frame(byteArrayOf(16)))
+        repeat(8) { queue.offer(VideoJob.Frame(byteArrayOf(it.toByte()))) }
+        queue.offer(VideoJob.Frame(byteArrayOf(8)))
 
         assertEquals(VideoJob.Resync, queue.poll(0))
-        assertArrayEquals(byteArrayOf(16), (queue.poll(0) as VideoJob.Frame).nalus)
+        assertArrayEquals(byteArrayOf(8), (queue.poll(0) as VideoJob.Frame).nalus)
         assertNull(queue.poll(0))
     }
 

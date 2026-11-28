@@ -889,7 +889,8 @@ class ClusterFlyControllerTest {
         assertFalse(sent.contains(FlyCommand.NAV_FRONT))
         now = 3_000L
         runScheduled()
-        assertTrue(sent.contains(FlyCommand.NAV_BACK))
+        // NAV_FRONT was cancelled before it went out, so there is no page to retract.
+        assertFalse(sent.contains(FlyCommand.NAV_BACK))
         assertEquals(FlyPhase.IDLE, controller.phase)
     }
 }

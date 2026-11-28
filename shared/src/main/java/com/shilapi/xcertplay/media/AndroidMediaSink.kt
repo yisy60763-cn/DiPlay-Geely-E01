@@ -954,8 +954,12 @@ private class AudioRenderer(
                     .setBufferSizeInBytes(plan.trackBufferBytes)
                     .build()
             } else {
+                // Android 5.1 (the E01 target) has no AudioAttributes usage routing. Use the
+                // channel mapper's legacy stream so telephony is not incorrectly sent as music.
+                val legacyStream = streamType()
+                routeLabel = "legacy streamType=$legacyStream"
                 @Suppress("DEPRECATION")
-                AudioTrack(AudioManager.STREAM_MUSIC, format.sampleRate, channelMask, encoding,
+                AudioTrack(legacyStream, format.sampleRate, channelMask, encoding,
                     plan.trackBufferBytes, AudioTrack.MODE_STREAM)
             }
         } else {

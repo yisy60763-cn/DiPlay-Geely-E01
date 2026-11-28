@@ -239,7 +239,8 @@ class AndroidMediaSink(    surface: Surface? = null,
             mode = if (advancedAudioChannelMapping) AudioChannelMappingMode.AUTOMOTIVE_BUS else AudioChannelMappingMode.MOBILE_COMPATIBLE,
             navigationStreamType = navigationStreamType,
         ).channel == AudioChannel.NAVIGATION
-        compositeGain.onStreamStarted(type, isNav)
+        val isTelephony = format.audioType.equals("telephony", ignoreCase = true)
+        compositeGain.onStreamStarted(type, isNav, isTelephony)
         publishMediaGain(format.audioType)
         renderer.start()
         if (format.audioType == "media") updateMediaAudio(type, true)
@@ -337,7 +338,7 @@ class AndroidMediaSink(    surface: Surface? = null,
         DiagLog.i(
             "DiPlay-AudioFocus",
             "media effective=${state.effective} focus=${state.focus} nav=${state.navigationStreams} " +
-                "audioType=$audioType",
+                "audioType=$audioType phoneStreams=${state.telephonyStreams}",
         )
     }
 

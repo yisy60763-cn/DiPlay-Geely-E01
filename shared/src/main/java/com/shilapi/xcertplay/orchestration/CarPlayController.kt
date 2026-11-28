@@ -2114,6 +2114,22 @@ class CarPlayController(
     }
 
     private fun onIphonePermission(result: IphoneUsbHost.PermissionResult) {
+        val device = when (result) {
+            is IphoneUsbHost.PermissionResult.Granted -> result.device
+            is IphoneUsbHost.PermissionResult.Denied -> result.device
+        }
+        // A permission broadcast can arrive after detach/re-enumeration. VID/PID alone is not
+        // sufficient: an iPhone can return with a different product ID, and a stale denial must
+        // not fail the new connection attempt. Require the exact USB device instance to remain
+        // present on the bus and a phase that is currently waiting for this permission.
+        if (
+            closed ||
+            phase !in setOf(Phase.REENUMERATION, Phase.IPHONE) ||
+            !isCurrentIphoneUsbDevice(device)
+        ) {
+            debugLog("wired ignoring stale iPhone USB permission result " + describeAppleUsbDevice(device))
+            return
+        }
         when (result) {
             is IphoneUsbHost.PermissionResult.Granted -> {
                 // The system broadcast and the polling fallback can both observe the grant.
@@ -2152,6 +2168,18 @@ class CarPlayController(
                 onStatus(CarPlayStatus.Failed(CarPlayFailureReason.IPHONE_USB_PERMISSION_DENIED))
             }
         }
+    }
+
+    private fun isCurrentIphoneUsbDevice(device: UsbDevice): Boolean = try {
+        usbManager.deviceList.values.any { current ->
+            current.deviceId == device.deviceId &&
+                current.deviceName == device.deviceName &&
+                current.vendorId == device.vendorId &&
+                current.productId == device.productId
+        }
+    } catch (error: RuntimeException) {
+        debugLog("wired USB device-list check failed: ${error.message}")
+        false
     }
 
     /** Some Android builds grant the dialog without delivering the permission broadcast. */

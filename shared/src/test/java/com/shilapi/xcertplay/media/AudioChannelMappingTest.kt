@@ -13,6 +13,7 @@ class AudioChannelMappingTest {
             payloadType = 100,
             channel = AudioChannel.PHONE,
             contentType = AudioContentType.SPEECH,
+            streamType = AudioManager.STREAM_VOICE_CALL,
         )
         assertMapped(
             mode = AudioChannelMappingMode.MOBILE_COMPATIBLE,
@@ -65,6 +66,7 @@ class AudioChannelMappingTest {
             payloadType = 100,
             channel = AudioChannel.PHONE,
             contentType = AudioContentType.SPEECH,
+            streamType = AudioManager.STREAM_VOICE_CALL,
         )
         assertMapped(
             mode = AudioChannelMappingMode.AUTOMOTIVE_BUS,

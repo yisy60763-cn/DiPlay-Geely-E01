@@ -730,7 +730,10 @@ private class AudioRenderer(
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int)
 
-    private val queue = LinkedBlockingQueue<AudioPacket>(MAX_QUEUED_PACKETS)
+    // Wireless needs a larger burst buffer; wired mode keeps backlog bounded and favors freshness.
+    private val queue = LinkedBlockingQueue<AudioPacket>(
+        if (isWireless) MAX_QUEUED_PACKETS else WIRED_MAX_QUEUED_PACKETS,
+    )
     @Volatile private var running = true
     @Volatile private var started = false
     private var codec: MediaCodec? = null
@@ -802,12 +805,26 @@ private class AudioRenderer(
             val previous = lastArrivalNs.getAndSet(now)
             if (previous != 0L) maxArrivalGapMs.accumulateAndGet((now - previous) / 1_000_000L, ::maxOf)
         }
-        if (!started || !queue.offer(AudioPacket(rtp, sample))) {
-            if (started) packetsDropped.incrementAndGet()
-            if (started && !droppedPacketsLogged) {
-                droppedPacketsLogged = true
-                DiagLog.w(TAG, "audio queue full; dropping newest packets to bound latency")
-                report("Audio: queue full audioType=${format.audioType}")
+        if (!started) return
+        val packet = AudioPacket(rtp, sample)
+        if (!queue.offer(packet)) {
+            if (!isWireless) {
+                // Wired playback has no radio jitter to absorb: drop stale queued data first.
+                queue.poll()
+                packetsDropped.incrementAndGet()
+                if (!queue.offer(packet)) packetsDropped.incrementAndGet()
+                if (!droppedPacketsLogged) {
+                    droppedPacketsLogged = true
+                    DiagLog.w(TAG, "wired audio queue full; dropping oldest packet to bound latency")
+                    report("Audio: wired queue full audioType=${format.audioType}")
+                }
+            } else {
+                packetsDropped.incrementAndGet()
+                if (!droppedPacketsLogged) {
+                    droppedPacketsLogged = true
+                    DiagLog.w(TAG, "audio queue full; dropping newest packets to bound latency")
+                    report("Audio: queue full audioType=${format.audioType}")
+                }
             }
         }
     }
@@ -1522,6 +1539,7 @@ private class AudioRenderer(
         const val BUFFER_TAIL_WAIT_NS = 500_000_000L
         // Holds a burst after a Wi-Fi gap (~4 s of AAC) instead of dropping it.
         const val MAX_QUEUED_PACKETS = 192
+        const val WIRED_MAX_QUEUED_PACKETS = 32
         const val PREBUFFER_WRITE_CHUNK_BYTES = 2 * 1024
         const val STATS_TAG = "DiPlay-AudioStats"
         const val STATS_WINDOW_NS = 5_000_000_000L

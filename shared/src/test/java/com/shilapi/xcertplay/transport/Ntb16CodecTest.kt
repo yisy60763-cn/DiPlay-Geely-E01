@@ -2,6 +2,7 @@ package com.shilapi.xcertplay.transport
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class Ntb16CodecTest {
@@ -23,6 +24,37 @@ class Ntb16CodecTest {
         assertEquals(65_535, block.size)
         assertEquals(0xff, block[8].toInt() and 0xff)
         assertEquals(0xff, block[9].toInt() and 0xff)
+    }
+
+    @Test
+    fun malformedNtbLengthIsRejectedWithoutThrowing() {
+        val block = Ntb16Codec.build(byteArrayOf(1, 2, 3, 4), 1)
+        block[8] = 0
+        block[9] = 0
+        assertTrue(Ntb16Codec.parse(block).isEmpty())
+    }
+
+    @Test
+    fun malformedNdpLengthIsRejectedWithoutThrowing() {
+        val block = Ntb16Codec.build(byteArrayOf(1, 2, 3, 4), 1)
+        block[16] = 0
+        block[17] = 0
+        assertTrue(Ntb16Codec.parse(block).isEmpty())
+    }
+
+    @Test
+    fun malformedNdpSignatureIsRejectedWithoutThrowing() {
+        val block = Ntb16Codec.build(byteArrayOf(1, 2, 3, 4), 1)
+        block[12] = 0
+        assertTrue(Ntb16Codec.parse(block).isEmpty())
+    }
+
+    @Test
+    fun datagramPointerOutsideBlockIsIgnored() {
+        val block = Ntb16Codec.build(byteArrayOf(1, 2, 3, 4), 1)
+        block[20] = 0xff.toByte()
+        block[21] = 0xff.toByte()
+        assertTrue(Ntb16Codec.parse(block).isEmpty())
     }
 
     @Test(expected = IllegalArgumentException::class)

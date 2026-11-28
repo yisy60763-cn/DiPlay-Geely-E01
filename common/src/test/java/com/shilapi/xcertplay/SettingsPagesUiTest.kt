@@ -51,9 +51,18 @@ class SettingsPagesUiTest {
         return result
     }
 
+    private fun isEffectivelyVisible(view: View): Boolean {
+        var current: View? = view
+        while (current != null) {
+            if (current.visibility != View.VISIBLE) return false
+            current = current.parent as? View
+        }
+        return true
+    }
+
     private fun texts(activity: DiPlayActivity): List<String> =
         allViews(activity)
-            .filter { it.visibility == View.VISIBLE }
+            .filter(::isEffectivelyVisible)
             .filterIsInstance<TextView>()
             .mapNotNull { it.text?.toString() }
             .filter { it.isNotBlank() }
@@ -76,7 +85,7 @@ class SettingsPagesUiTest {
         val activity = open("home")
         val shown = texts(activity)
         val buttons = allViews(activity)
-            .filter { it.visibility == View.VISIBLE }
+            .filter(::isEffectivelyVisible)
             .filterIsInstance<Button>()
             .mapNotNull { it.text?.toString() }
         assertTrue("wired connection action is present", buttons.any { it.contains("Wired", ignoreCase = true) })

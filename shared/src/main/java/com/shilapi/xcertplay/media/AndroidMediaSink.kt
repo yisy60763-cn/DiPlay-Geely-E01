@@ -487,6 +487,14 @@ private class VideoDecoder(
                 }
                 it.configure(format, surface, null, 0)
                 it.start()
+                // Explicitly fit the decoded frame inside the output surface. In particular,
+                // avoid the cropping mode on older head units where the display and stream
+                // aspect ratios can differ slightly.
+                try {
+                    it.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT)
+                } catch (scalingError: Exception) {
+                    DiagLog.w(TAG, "video scale-to-fit unavailable; keeping decoder default", scalingError)
+                }
             }
         } catch (error: Exception) {
             runCatching { candidate?.release() }

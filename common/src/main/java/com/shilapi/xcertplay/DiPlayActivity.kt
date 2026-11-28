@@ -189,6 +189,8 @@ class DiPlayActivity : ComponentActivity() {
     private var bluetoothRestartInProgress = false
     private var initialLaunch = true
     private var usbAutoConnectScheduled = false
+    private var usbAutoConnectRunnable: Runnable? = null
+    private var usbAutoConnectAttempts = 0
     private var notificationTransport = true
     private var exportInProgress = false
     private var browseGeneration = 0
@@ -466,6 +468,7 @@ class DiPlayActivity : ComponentActivity() {
     }
     override fun onDestroy() {
         handler.removeCallbacks(maintenanceTick)
+        cancelPendingUsbAutoConnect("Activity destroyed")
         // The tone outlives the page it was started from otherwise: a 4.5s release callback holds a
         // native AudioTrack, and an Activity destroyed inside those 4.5 seconds used to leave it
         // playing against a dead window — and the callback queued on a Handler that never ran.
@@ -3139,6 +3142,10 @@ class DiPlayActivity : ComponentActivity() {
             scheduleUsbAutoConnect("Apple USB device attached")
             return
         }
+        if (UsbAutoLaunch.isAppleDetach(intent)) {
+            cancelPendingUsbAutoConnect("Apple USB device detached before connection")
+            return
+        }
         if (!externalBluetoothSelected()) return
         val plugged = AdapterRoutes.active?.present(this) == true
         if (plugged == adapterPluggedSeen) return
@@ -3154,16 +3161,54 @@ class DiPlayActivity : ComponentActivity() {
     private fun scheduleUsbAutoConnect(reason: String) {
         if (usbAutoConnectScheduled) return
         usbAutoConnectScheduled = true
-        DiagLog.i("UsbAutoLaunch", "$reason; scheduling wired CarPlay startup")
-        handler.postDelayed({
-            usbAutoConnectScheduled = false
-            if (isFinishing || (Build.VERSION.SDK_INT >= 17 && isDestroyed)) return@postDelayed
-            if (CarPlayBackgroundSession.hasSession()) {
-                openProjection()
-            } else {
-                connect(wireless = false)
+        usbAutoConnectAttempts = 0
+        DiagLog.i("UsbAutoLaunch", "$reason; waiting for the Apple USB device to settle")
+        val attempt = object : Runnable {
+            override fun run() {
+                if (usbAutoConnectRunnable !== this) return
+                if (isFinishing || (Build.VERSION.SDK_INT >= 17 && isDestroyed)) {
+                    cancelPendingUsbAutoConnect("Activity is no longer available")
+                    return
+                }
+                // USB attach can arrive before UsbManager.deviceList is populated. Retry briefly,
+                // but never start a stale session after the driver has unplugged the iPhone.
+                if (!hasAppleUsbDeviceAttached()) {
+                    if (usbAutoConnectAttempts < USB_AUTO_CONNECT_RETRIES) {
+                        usbAutoConnectAttempts++
+                        handler.postDelayed(this, USB_AUTO_CONNECT_RETRY_MS)
+                    } else {
+                        cancelPendingUsbAutoConnect("Apple USB device did not remain attached")
+                        DiagLog.w("UsbAutoLaunch", "USB attach disappeared before wired startup")
+                    }
+                    return
+                }
+                usbAutoConnectRunnable = null
+                usbAutoConnectScheduled = false
+                usbAutoConnectAttempts = 0
+                DiagLog.i("UsbAutoLaunch", "Apple USB device present; starting wired CarPlay")
+                if (CarPlayBackgroundSession.hasSession()) {
+                    openProjection()
+                } else {
+                    connect(wireless = false)
+                }
             }
-        }, USB_AUTO_CONNECT_DEBOUNCE_MS)
+        }
+        usbAutoConnectRunnable = attempt
+        handler.postDelayed(attempt, USB_AUTO_CONNECT_DEBOUNCE_MS)
+    }
+
+    private fun hasAppleUsbDeviceAttached(): Boolean = runCatching {
+        val manager = getSystemService(Context.USB_SERVICE) as? UsbManager ?: return false
+        manager.deviceList.values.any { UsbAutoLaunch.isAppleDevice(it) }
+    }.getOrDefault(false)
+
+    private fun cancelPendingUsbAutoConnect(reason: String) {
+        val pending = usbAutoConnectRunnable
+        if (pending != null) handler.removeCallbacks(pending)
+        if (usbAutoConnectScheduled) DiagLog.i("UsbAutoLaunch", reason)
+        usbAutoConnectRunnable = null
+        usbAutoConnectScheduled = false
+        usbAutoConnectAttempts = 0
     }
 
     @android.annotation.SuppressLint("MissingPermission")
@@ -4290,6 +4335,8 @@ class DiPlayActivity : ComponentActivity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     companion object {
         private const val USB_AUTO_CONNECT_DEBOUNCE_MS = 650L
+        private const val USB_AUTO_CONNECT_RETRY_MS = 350L
+        private const val USB_AUTO_CONNECT_RETRIES = 8
         const val EXTRA_SETTINGS_TAB = "settings_tab"
         private const val KEY_SETTINGS_TAB = "key_settings_tab"
 

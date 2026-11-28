@@ -17,7 +17,7 @@ class PerformanceSnapshotTest {
         assertEquals("RAM: 1.2 GB / 2.0 GB (58%)", snapshot.memoryText)
         assertEquals("机身存储: 18.0 GB / 32.0 GB (56%)", snapshot.storageText)
         assertEquals("链路: Wi-Fi · 5 GHz · 433 Mbps (-48 dBm)", snapshot.linkText)
-        assertEquals("视频 FPS: 接收 30.0 / 提交 30.0 · 延迟: 82ms · 屏幕 60Hz", snapshot.mediaText)
+        assertEquals("视频 FPS: 接收 30.0 / 提交 30.0 · 延迟: 82ms · 屏幕刷新率 60Hz", snapshot.mediaText)
     }
 
     @Test
@@ -48,6 +48,6 @@ class PerformanceSnapshotTest {
         assertEquals("CPU: 50% (8核 @ 800MHz)", snapshot.cpuText)
         assertEquals("RAM: 1.8 GB / 2.0 GB (87%) [低内存警告]", snapshot.memoryText)
         assertEquals("链路: 车机热点 · Geely-Car · 5 GHz", snapshot.linkText)
-        assertEquals("视频 FPS: 接收 60.0 / 提交 59.8 · 屏幕 60Hz", snapshot.mediaText)
+        assertEquals("视频 FPS: 接收 60.0 / 提交 59.8 · 屏幕刷新率 60Hz", snapshot.mediaText)
     }
 }

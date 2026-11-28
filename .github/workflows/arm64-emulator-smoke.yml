@@ -70,9 +70,28 @@ jobs:
         if: failure()
         run: |
           mkdir -p emulator-diagnostics
-          adb logcat -d -t 10000 > emulator-diagnostics/logcat.txt || true
-          adb shell dumpsys activity > emulator-diagnostics/activity.txt || true
-          adb shell dumpsys package com.shihab.diplay > emulator-diagnostics/package.txt || true
+          # A broken ADB daemon must not leave the diagnostic step hanging forever.
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          commands = {
+              "logcat.txt": ["adb", "logcat", "-d", "-t", "10000"],
+              "activity.txt": ["adb", "shell", "dumpsys", "activity"],
+              "package.txt": ["adb", "shell", "dumpsys", "package", "com.shihab.diplay"],
+          }
+          for filename, command in commands.items():
+              try:
+                  result = subprocess.run(command, capture_output=True, text=True, timeout=12)
+                  output = result.stdout + (("\\nSTDERR:\\n" + result.stderr) if result.stderr else "")
+                  if result.returncode:
+                      output += f"\\ncommand exit code: {result.returncode}\\n"
+              except subprocess.TimeoutExpired:
+                  output = "Timed out after 12 seconds; ADB/emulator was not responding.\\n"
+              except Exception as error:
+                  output = f"Could not collect diagnostics: {error}\\n"
+              Path("emulator-diagnostics", filename).write_text(output, encoding="utf-8")
+          PY
       - name: Publish emulator diagnostics
         if: failure()
         uses: actions/upload-artifact@v4

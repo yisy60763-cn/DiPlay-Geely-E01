@@ -19,12 +19,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
 
 /**
- * The wireless page is one long scroll and most of its controls repaint by rebuilding it, so a rebuild
- * that started the page at the top moved the card the driver had just touched off the screen.
- *
- * It used to be the settings page. That page is a hub of four entries now, short enough that there is
- * nothing to scroll and the offsets below would prove nothing, so the check moved to a page that is
- * still long: the same code either way, since the offset is kept per page.
+ * The display page contains the long performance controls and repaints when a setting changes.
+ * These checks keep the per-page scroll offset behavior without depending on removed wireless pages
+ * or on a short settings tab.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "en")
@@ -32,7 +29,7 @@ class SettingsScrollUiTest {
     @Test fun repaintingAPageComesBackToWhereTheDriverWas() {
         val controller = Robolectric.buildActivity(
             DiPlayActivity::class.java,
-            Intent().putExtra("page", "settings").putExtra(DiPlayActivity.EXTRA_SETTINGS_TAB, "system"),
+            Intent().putExtra("page", "display"),
         ).setup()
         val activity = controller.get()
         try {
@@ -63,7 +60,7 @@ class SettingsScrollUiTest {
     @Test fun anotherPageStillStartsAtTheTop() {
         val controller = Robolectric.buildActivity(
             DiPlayActivity::class.java,
-            Intent().putExtra("page", "settings"),
+            Intent().putExtra("page", "display"),
         ).setup()
         val activity = controller.get()
         try {

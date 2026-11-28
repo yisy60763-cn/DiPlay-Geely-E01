@@ -1,7 +1,7 @@
 name: Android checks
 on:
   push:
-    branches: [main, geekplay-e01-improve]
+    branches: [main, geekplay-e01-improve, wired-only-e01]
   workflow_dispatch:
 concurrency:
   group: android-checks-${{ github.ref }}

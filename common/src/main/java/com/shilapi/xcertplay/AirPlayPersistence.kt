@@ -565,9 +565,12 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadFps(context: Context): Int = AirPlayDisplaySettings.sanitizeFps(
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_FPS, 30),
+    fun loadFps(context: Context): Int = maxOf(
+        AirPlayDisplaySettings.DEFAULT_FPS,
+        AirPlayDisplaySettings.sanitizeFps(
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getInt(KEY_FPS, AirPlayDisplaySettings.DEFAULT_FPS),
+        ),
     )
 
     fun loadMediaBufferMillis(context: Context): Int = com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(

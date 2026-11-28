@@ -2371,13 +2371,14 @@ class CarPlayController(
                     }
                     var ncm: NcmUsbBridge? = null
                     try {
-                        ncm = openNcm(device)
+                        val openedNcm = openNcm(device)
+                        ncm = openedNcm
                         if (!current()) {
-                            closeBestEffort("stale NCM bridge") { ncm.close() }
+                            closeBestEffort("stale NCM bridge") { openedNcm.close() }
                             closeBestEffort("stale USBMUX session") { result.session.close() }
                             return@openIap2UsbSessionAsync
                         }
-                        runStack(result.session, ncm, generation)
+                        runStack(result.session, openedNcm, generation)
                     } catch (error: Throwable) {
                         ncm?.let { closeBestEffort("failed NCM bridge") { it.close() } }
                         closeBestEffort("failed USBMUX session") { result.session.close() }

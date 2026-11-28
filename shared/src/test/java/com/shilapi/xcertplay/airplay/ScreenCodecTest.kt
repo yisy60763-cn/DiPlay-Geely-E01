@@ -3,9 +3,20 @@ package com.shilapi.xcertplay.airplay
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class ScreenCodecTest {
+    @Test
+    fun unsignedScreenBodyLengthRejectsSignedOverflowAndOversizedFrames() {
+        assertTrue(ScreenStream.isValidBodySize(0))
+        assertTrue(ScreenStream.isValidBodySize(ScreenStream.MAX_BODY))
+        assertFalse(ScreenStream.isValidBodySize(ScreenStream.MAX_BODY + 1))
+        assertFalse(ScreenStream.isValidBodySize(Int.MIN_VALUE))
+        assertFalse(ScreenStream.isValidBodySize(-1))
+    }
+
     @Test
     fun validLengthPrefixesBecomeAnnexBInPlace() {
         val first = byteArrayOf(0x40, 0x01)

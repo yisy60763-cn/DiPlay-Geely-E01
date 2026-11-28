@@ -82,10 +82,10 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
                         "previousProtocol=${previous.protocol} previousLength=${previous.length} " +
                         "nextProtocol=$followingProtocol nextLength=$followingLength " +
                         "lastUsbReadBytes=$lastUsbReadBytes bufferedBytes=$bufferedSize")
-                if (bytes.size < HEADER_BYTES) return null
+                if (bufferedSize < HEADER_BYTES) return null
                 length = readU32(bytes, 4)
             } else {
-                report("USBMUX framing rejected declaredLength=$length bufferedBytes=${bytes.size} " +
+                report("USBMUX framing rejected declaredLength=$length bufferedBytes=$bufferedSize " +
                     "lastUsbReadBytes=$lastUsbReadBytes optionalReplyPadding=${previous != null}")
                 throw IphoneUsbException.Protocol("Invalid USBMUX frame length $length")
             }
@@ -133,7 +133,7 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
     private companion object {
         const val HEADER_BYTES = 16
         const val INITIAL_CAPACITY = 256
-        const val MAX_BUFFER_BYTES = 65_540
+        const val MAX_BUFFER_BYTES = 1_048_576
         const val TCP_HEADER_BYTES = 20
         const val MAX_FRAME_BYTES = 65_536
         const val VERSION_BYTES = 20

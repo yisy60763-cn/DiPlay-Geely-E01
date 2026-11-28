@@ -38,7 +38,11 @@ jobs:
           arch: arm64-v8a
           profile: pixel_2
           disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
+          emulator-boot-timeout: 900
+          pre-emulator-launch-script: |
+            adb start-server
+            adb devices
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot
           script: |
             set -euo pipefail
             adb wait-for-device

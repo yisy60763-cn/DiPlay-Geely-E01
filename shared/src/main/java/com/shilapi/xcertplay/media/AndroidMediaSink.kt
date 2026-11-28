@@ -371,6 +371,8 @@ private class VideoDecoder(
     // The main screen keeps the historical log format; other screens are labelled.
     private val stats = VideoStats(if (streamType == 110) "" else " stream=$streamType")
     private val decodeSeries = if (streamType == 110) "video/decode" else "video/decode[$streamType]"
+    private val queueWaitSeries = if (streamType == 110) "video/queue-wait" else "video/queue-wait[$streamType]"
+    private val inputWaitSeries = if (streamType == 110) "video/input-wait" else "video/input-wait[$streamType]"
     /** Kept from the constructor argument, which is not a property and cannot be read from a method. */
     private val streamLabel = if (streamType == 110) "" else "[$streamType]"
     private val videoBufferInfo = MediaCodec.BufferInfo()
@@ -407,7 +409,7 @@ private class VideoDecoder(
                             if (System.nanoTime() - job.receivedNs > MAX_FRAME_AGE_NS) {
                                 queue.discardFrames()
                                 recover("video backlog exceeded 250 ms")
-                            } else feed(job.nalus)
+                            } else feed(job.nalus, job.receivedNs)
                         }
                         is VideoJob.SurfaceChanged -> changeSurface(job.surface, job.applied)
                         is VideoJob.Resync -> recover("video queue overflow")
@@ -549,7 +551,9 @@ private class VideoDecoder(
         applied(ok)
     }
 
-    private fun feed(nalus: ByteArray) {
+    private fun feed(nalus: ByteArray, receivedNs: Long) {
+        val queueWaitMs = (System.nanoTime() - receivedNs).coerceAtLeast(0L) / 1_000_000L
+        PerfTrace.record(queueWaitSeries, queueWaitMs, warnAboveMs = 100)
         val config = lastConfig ?: return
         if (outputSurface == null) return
         if (nalus.isEmpty()) { recover("invalid video access unit"); return }
@@ -573,10 +577,13 @@ private class VideoDecoder(
                     "head=${nalus.take(16).joinToString("") { "%02x".format(it.toInt() and 0xff) }}",
             )
         }
+        val inputWaitStartedNs = System.nanoTime()
         val index = VideoInputPump.acquire(
             running = { running }, drain = { drainOutput(codec) },
             dequeue = { codec.dequeueInputBuffer(INPUT_TIMEOUT_US) },
         )
+        val inputWaitMs = (System.nanoTime() - inputWaitStartedNs).coerceAtLeast(0L) / 1_000_000L
+        PerfTrace.record(inputWaitSeries, inputWaitMs, warnAboveMs = 20)
         if (index < 0) { recover("video decoder input stalled"); return }
         @Suppress("DEPRECATION")
         val input = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) codec.getInputBuffer(index) else codec.inputBuffers[index]

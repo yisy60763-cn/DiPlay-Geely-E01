@@ -752,4 +752,145 @@ class ClusterFlyControllerTest {
         scheduled.removeAt(0).second()
         assertEquals(listOf(FlyCommand.NAV_MODE_OFF, FlyCommand.NAV_OFF), sent)
     }
+
+
+    @Test
+    fun `radar during arming cancels queued open commands`() {
+        val controller = controller()
+        controller.onGesture(Decision.FLY_LEFT)
+        assertEquals(listOf(FlyCommand.NAV_ON, FlyCommand.NAV_MODE_ON), sent)
+
+        controller.onRadar(true)
+        assertEquals(FlyPhase.IDLE, controller.phase)
+        assertEquals(
+            listOf(
+                FlyCommand.NAV_ON,
+                FlyCommand.NAV_MODE_ON,
+                FlyCommand.NAV_MODE_OFF,
+                FlyCommand.NAV_OFF,
+            ),
+            sent,
+        )
+
+        // The queued NAV_FRONT and FLY_LEFT belong to the cancelled generation. Only the
+        // scheduled withdrawal's NAV_BACK is allowed to run.
+        now = 3_000L
+        runScheduled()
+        assertFalse(sent.contains(FlyCommand.NAV_FRONT))
+        assertFalse(sent.contains(FlyCommand.FLY_LEFT))
+        assertEquals(FlyCommand.NAV_BACK, sent.last())
+    }
+
+    @Test
+    fun `radar during playback dismisses the mirror and owes the close until clear`() {
+        var giveUps = 0
+        val controller = ClusterFlyController(
+            commands = { sent.add(it) },
+            showWarning = { warnings.add(it) },
+            log = { lines.add(it) },
+            clock = { now },
+            postDelayed = { delay, action -> scheduled.add(delay to action) },
+            onGiveUp = { giveUps++ },
+        )
+        controller.onGesture(Decision.FLY_LEFT)
+        now = 3_000L
+        runScheduled()
+        now = 3_100L
+        controller.onMirrorReady()
+        assertEquals(FlyPhase.PUSHING, controller.phase)
+
+        now = 3_200L
+        controller.onRadar(true)
+        assertEquals(FlyPhase.CLOSING, controller.phase)
+        assertEquals(1, giveUps)
+        assertFalse(sent.contains(FlyCommand.FLY_RIGHT))
+
+        // The close is not sent while radar is active. Clearing the interlock releases it.
+        now = 5_200L
+        controller.onRadar(false)
+        assertTrue(sent.contains(FlyCommand.FLY_RIGHT))
+        assertEquals(1, giveUps)
+    }
+
+    @Test
+    fun `radar during the video wait dismisses the pending presentation`() {
+        var giveUps = 0
+        val controller = ClusterFlyController(
+            commands = { sent.add(it) },
+            showWarning = { warnings.add(it) },
+            log = { lines.add(it) },
+            clock = { now },
+            postDelayed = { delay, action -> scheduled.add(delay to action) },
+            onGiveUp = { giveUps++ },
+        )
+        openToLeft(controller)
+        assertEquals(FlyPhase.WAITING_FOR_VIDEO, controller.phase)
+
+        controller.onRadar(true)
+
+        assertEquals(FlyPhase.CLOSING, controller.phase)
+        assertEquals(1, giveUps)
+    }
+
+    @Test
+    fun `radar activation while waiting aborts the pending fly safely`() {
+        val controller = waiting()
+        controller.onRadar(true)
+        assertEquals(FlyPhase.CLOSING, controller.phase)
+        assertFalse(sent.contains(FlyCommand.NAV_MODE_OFF))
+        assertTrue(lines.contains("fly.safety on RADAR"))
+        val beforeClear = scheduled.size
+        controller.onRadar(false)
+        val closeCallbacks = scheduled.drop(beforeClear)
+        now = 4_000L
+        closeCallbacks.first { it.first == 1_000L }.second()
+        assertTrue(sent.contains(FlyCommand.FLY_RIGHT))
+        assertFalse(sent.contains(FlyCommand.NAV_MODE_OFF))
+        now = 5_000L
+        closeCallbacks.first { it.first == 2_000L }.second()
+        assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
+    }
+
+    @Test
+    fun `ecall activation while waiting aborts the pending fly safely`() {
+        val controller = waiting()
+        controller.onEcall(true)
+        assertEquals(FlyPhase.CLOSING, controller.phase)
+        assertFalse(sent.contains(FlyCommand.NAV_MODE_OFF))
+        assertTrue(lines.contains("fly.safety on ECALL"))
+        val beforeClear = scheduled.size
+        controller.onEcall(false)
+        val closeCallbacks = scheduled.drop(beforeClear)
+        now = 4_000L
+        closeCallbacks.first { it.first == 1_000L }.second()
+        assertTrue(sent.contains(FlyCommand.FLY_RIGHT))
+        assertFalse(sent.contains(FlyCommand.NAV_MODE_OFF))
+        now = 5_000L
+        closeCallbacks.first { it.first == 2_000L }.second()
+        assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
+    }
+
+    @Test
+    fun `radar withdraws prearmed navigation and cancels queued front`() {
+        val controller = controller()
+        controller.onCarPlayStarted()
+        assertEquals(listOf(FlyCommand.NAV_ON, FlyCommand.NAV_MODE_ON), sent)
+        assertTrue(scheduled.isNotEmpty())
+
+        controller.onRadar(true)
+        assertFalse(sent.contains(FlyCommand.NAV_FRONT))
+
+        // Withdrawal can be queued behind the MCU spacing guard; run the scheduled step
+        // rather than assuming NAV_MODE_OFF and NAV_OFF are emitted synchronously.
+        now = 2_000L
+        runScheduled()
+        assertTrue(sent.contains(FlyCommand.NAV_MODE_OFF))
+        assertTrue(sent.contains(FlyCommand.NAV_OFF))
+        assertFalse(sent.contains(FlyCommand.NAV_FRONT))
+        now = 3_000L
+        runScheduled()
+        // NAV_FRONT was cancelled before it went out, so there is no page to retract.
+        assertFalse(sent.contains(FlyCommand.NAV_BACK))
+        assertEquals(FlyPhase.IDLE, controller.phase)
+    }
 }

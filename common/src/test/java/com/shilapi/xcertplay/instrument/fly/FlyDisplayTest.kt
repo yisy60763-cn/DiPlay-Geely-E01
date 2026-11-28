@@ -23,6 +23,11 @@ class FlyDisplayTest {
         assertEquals(other, chooseClusterDisplay(listOf(center, other)))
     }
 
+    @Test fun ambiguousNonMatchingSecondaryDisplaysAreNotGuessed() {
+        val second = FlyDisplayInfo(7, "External Display", 1280, 720, defaultDisplay = false)
+        assertNull(chooseClusterDisplay(listOf(center, other, second)))
+    }
+
     @Test fun linesNameTheChoiceAndDoNotContainADottedAddress() {
         val lines = displayLines(listOf(center, cluster), cluster)
         assertEquals("fly.display list 0:Built-in Screen:1920x720:default 2:HDMI Screen:1920x720", lines[0])

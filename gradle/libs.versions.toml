@@ -15,6 +15,7 @@ conscrypt = "2.5.2"
 jmdns = "3.6.3"
 desugarJdkLibs = "2.1.5"
 libaums = "0.10.0"
+multidex = "2.0.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -29,6 +30,7 @@ conscrypt = { group = "org.conscrypt", name = "conscrypt-android", version.ref =
 jmdns = { group = "org.jmdns", name = "jmdns", version.ref = "jmdns" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 libaums-core = { group = "me.jahnen.libaums", name = "core", version.ref = "libaums" }
+androidx-multidex = { group = "androidx.multidex", name = "multidex", version.ref = "multidex" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

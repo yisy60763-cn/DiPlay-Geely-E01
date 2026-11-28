@@ -11,13 +11,13 @@ val localAuthenticationAssets = gradle.startParameter.projectProperties["authAss
 android {
     namespace = "com.shilapi.xcertplay"
     compileSdk {
-        version = release(37)
+        version = release(36)
     }
 
     defaultConfig {
         applicationId = "com.shihab.diplay"
         minSdk = 19
-        targetSdk = 37
+        targetSdk = 36
         multiDexEnabled = true
         versionCode = 51
         versionName = "0.5.1-geely"
@@ -108,7 +108,7 @@ dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(project(":common"))
     implementation(project(":shared"))
-    implementation("androidx.multidex:multidex:2.0.1")
+    implementation(libs.androidx.multidex)
 }
 
 // No implicit import. Only the two explicitly selected local runtime assets are allowed.

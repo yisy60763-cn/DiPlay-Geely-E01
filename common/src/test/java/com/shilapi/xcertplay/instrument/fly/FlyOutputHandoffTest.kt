@@ -22,13 +22,13 @@ class FlyOutputHandoffTest {
     @Test fun aFailedAttachRestoresTheCenterAndDoesNotStayOpen() {
         val handoff = handoff(detachOk = true, attachOk = false)
         handoff.begin(newCenter(), surface("cluster"), onReady = { calls += "ready" }, onFailed = { calls += "failed" })
-        assertEquals(listOf("detach", "open", "attach", "close", "restore", "failed"), calls)
+        assertEquals(listOf("detach", "open", "attach", "restore", "close", "failed"), calls)
     }
 
     @Test fun aBrokenMirrorRestoresTheCenter() {
         val handoff = handoff(detachOk = true, attachOk = true, mirrorBreaks = true)
         handoff.begin(newCenter(), surface("cluster"), onReady = { calls += "ready" }, onFailed = { calls += "failed" })
-        assertEquals(listOf("detach", "open", "restore", "failed"), calls)
+        assertEquals(listOf("detach", "open", "restore", "close", "failed"), calls)
     }
 
     @Test fun beginReportsTheDetachAndAttachResults() {
@@ -74,6 +74,88 @@ class FlyOutputHandoffTest {
         handoff.end { calls += "done" }
         deliverDetach?.invoke(true)
         assertEquals(listOf("detach", "restore", "close", "done"), calls)
+    }
+
+    @Test fun repeatedEndDuringRestoreWaitsAndRunsBothCallbacks() {
+        var restore: ((Boolean) -> Unit)? = null
+        val handoff = FlyOutputHandoff(
+            replaceOutput = { surface, applied ->
+                val kind = when {
+                    surface == null -> "detach"
+                    surface === center -> "restore"
+                    else -> "attach"
+                }
+                calls += kind
+                if (kind == "restore") restore = applied else applied(true)
+            },
+            openMirror = { _, _, onTexture, _ -> onTexture(surface("texture")) },
+            closeMirror = { calls += "close" },
+        )
+        handoff.begin(newCenter(), surface("cluster"), onReady = {}, onFailed = {})
+        calls.clear()
+        handoff.end { calls += "done-1" }
+        handoff.end { calls += "done-2" }
+        assertEquals(listOf("restore"), calls)
+        restore?.invoke(true)
+        assertEquals(listOf("restore", "close", "done-1", "done-2"), calls)
+    }
+
+
+    @Test fun failedRestoreRetriesAndKeepsMirrorAlive() {
+        var restoreAttempts = 0
+        var completed = false
+        var closed = false
+        val centerSurface = newCenter()
+        val handoff = FlyOutputHandoff(
+            replaceOutput = { surface, applied ->
+                if (surface == null) {
+                    applied(true)
+                } else if (surface === centerSurface) {
+                    restoreAttempts++
+                    applied(false)
+                } else {
+                    applied(true)
+                }
+            },
+            openMirror = { _, _, onTexture, _ -> onTexture(surface("texture")) },
+            closeMirror = { closed = true },
+        )
+        handoff.begin(centerSurface, surface("cluster"), onReady = {}, onFailed = {})
+        handoff.end { completed = true }
+
+        assertEquals(3, restoreAttempts)
+        assertEquals(false, closed)
+        assertEquals(false, completed)
+    }
+
+    @Test fun exhaustedRestoreCanRecoverOnLaterEndCall() {
+        var attempts = 0
+        var firstDone = false
+        var secondDone = false
+        var closed = false
+        val centerSurface = newCenter()
+        val handoff = FlyOutputHandoff(
+            replaceOutput = { surface, applied ->
+                if (surface == null) applied(true)
+                else if (surface === centerSurface) {
+                    attempts++
+                    applied(attempts > 3)
+                } else applied(true)
+            },
+            openMirror = { _, _, onTexture, _ -> onTexture(surface("texture")) },
+            closeMirror = { closed = true },
+        )
+        handoff.begin(centerSurface, surface("cluster"), onReady = {}, onFailed = {})
+        handoff.end { firstDone = true }
+        assertEquals(3, attempts)
+        assertEquals(false, firstDone)
+        assertEquals(false, closed)
+
+        handoff.end { secondDone = true }
+        assertEquals(4, attempts)
+        assertEquals(true, closed)
+        assertEquals(true, firstDone)
+        assertEquals(true, secondDone)
     }
 
     private fun newCenter(): Surface = surface("center").also { center = it }

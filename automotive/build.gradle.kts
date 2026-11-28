@@ -5,13 +5,13 @@ plugins {
 android {
     namespace = "com.shilapi.xcertplay"
     compileSdk {
-        version = release(37)
+        version = release(36)
     }
 
     defaultConfig {
         applicationId = "com.shilapi.xcertplay"
         minSdk = 28
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 1201
         versionName = "1.2.1"
 

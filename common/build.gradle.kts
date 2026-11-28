@@ -45,7 +45,7 @@ fun supabaseField(name: String): String {
 android {
     namespace = "com.shilapi.xcertplay.host"
     compileSdk {
-        version = release(37)
+        version = release(36)
     }
 
     buildFeatures {

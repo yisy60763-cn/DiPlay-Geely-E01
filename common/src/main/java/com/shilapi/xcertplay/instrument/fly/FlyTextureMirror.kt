@@ -243,8 +243,16 @@ internal class FlyTextureMirror(private val log: (String) -> Unit) {
         }
         // The frame is consumed even when only the cluster window is current: an unconsumed
         // texture fills the decoder's output queue and stops the centre picture with it.
-        texture.updateTexImage()
-        texture.getTransformMatrix(texMatrix)
+        try {
+            texture.updateTexImage()
+            texture.getTransformMatrix(texMatrix)
+        } catch (error: RuntimeException) {
+            // SurfaceTexture can be released concurrently with the frame callback during teardown.
+            // Treat that frame as lost rather than killing the GL looper on a native exception.
+            log("fly.display updateTexImage failed ${error.javaClass.simpleName}")
+            countFrameFailure()
+            return
+        }
         if (centerCurrent) {
             draw(centerWidth, centerHeight)
             EGL14.eglSwapBuffers(eglDisplay, centerWindow)
@@ -396,8 +404,11 @@ internal class FlyTextureMirror(private val log: (String) -> Unit) {
         }
         centerEgl = null
         clusterEgl = null
-        if (eglDisplay != null && eglContext != null) {
-            EGL14.eglDestroyContext(eglDisplay, eglContext)
+        if (eglDisplay != null) {
+            if (eglContext != null && eglContext != EGL14.EGL_NO_CONTEXT) {
+                EGL14.eglDestroyContext(eglDisplay, eglContext)
+            }
+            // Terminate even when context creation failed partway through initialization.
             EGL14.eglTerminate(eglDisplay)
         }
         context = null

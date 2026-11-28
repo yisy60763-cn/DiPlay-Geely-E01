@@ -101,6 +101,23 @@ class ClusterFlySession(
         lastConditions = conditions
         val safety = safetyBlock(conditions)
 
+        if (phase == FlyPhase.ARMING && safety != null) {
+            // A safety event can arrive between the queued MCU hops. Cancel the remaining open
+            // steps and withdraw the navigation state; otherwise a delayed FLY_LEFT could still
+            // lift the page after the warning appeared.
+            val aborted = onAbort(nowMillis)
+            return effect(steps = aborted.steps, warning = safety)
+        }
+
+        if (phase == FlyPhase.WAITING_FOR_VIDEO && safety != null) {
+            // The page has already been lifted even though no frame is flowing. Withdraw it too;
+            // leaving the cluster on a blank navigation layer during a safety event is unsafe.
+            closeOwed = true
+            phase = FlyPhase.CLOSING
+            closeNavOffAt = nowMillis
+            return effect(warning = safety)
+        }
+
         if (phase == FlyPhase.PUSHING && safety != null) {
             // Stop the picture now; the factory would drop a close sent during the warning, so the
             // close is owed until the warning clears.

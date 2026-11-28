@@ -183,6 +183,11 @@ class CarPlayHostActivity : ComponentActivity() {
      * never fly, and until one does there is no socket and no encoder to speak of.
      */
     private var clusterFly: ClusterFlyController? = null
+    // Safety broadcasts arrive as soon as the Activity is created, while the fly controller is
+    // deliberately lazy. Keep the latest states so the first swipe cannot miss an already-active
+    // radar warning or emergency call.
+    private var flyRadarActive = false
+    private var flyEcallActive = false
     private var flyClusterPresentation: FlyClusterPresentation? = null
     /** The window handoff and the texture mirror for the fly in progress, if any. */
     private var flyHandoff: FlyOutputHandoff? = null
@@ -604,12 +609,18 @@ class CarPlayHostActivity : ComponentActivity() {
         loadPersistedSettings()
         locationPermissionAvailable = hasFineLocationPermission()
         setContentView(buildContentView())
-        registerReceiver(
+        // The radar and eCall broadcasts are sent by the factory's separate system app.
+        // Explicitly mark this receiver exported for Android 13+ (targetSdk 36); the legacy
+        // overload can throw when registering for these non-platform actions. The head unit's
+        // Android 5.1 runtime is handled by AndroidX's compatibility implementation.
+        ContextCompat.registerReceiver(
+            this,
             flySafetyReceiver,
             IntentFilter().apply {
                 addAction(ACTION_RADAR_STATUS)
                 addAction(ACTION_ECALL_STATUS)
             },
+            ContextCompat.RECEIVER_EXPORTED,
         )
         applyFullscreenMode()
         onBackPressedDispatcher.addCallback(
@@ -2592,7 +2603,11 @@ class CarPlayHostActivity : ComponentActivity() {
                     runOnUiThread { report(witness) }
                 }
             },
-        ).also { clusterFly = it }
+        ).also { controller ->
+            clusterFly = controller
+            if (flyRadarActive) controller.onRadar(true)
+            if (flyEcallActive) controller.onEcall(true)
+        }
 
     /**
      * Puts the fly picture on the cluster's own display.
@@ -2771,9 +2786,14 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
         handoff.end { finish() }
-        // The restore is one job on the decoder thread. A dead or busy decoder would otherwise hold
-        // the window open forever: after one second the teardown is finished regardless.
-        mainHandler.postDelayed({ if (flyClosing) finish() }, FLY_TEARDOWN_FALLBACK_MILLIS)
+        // Never force teardown on a timeout: if the decoder rejected its centre Surface,
+        // closing EGL would release the texture it may still be writing into and black out the
+        // centre display. FlyOutputHandoff retries restoration; this timer is diagnostic only.
+        mainHandler.postDelayed({
+            if (flyClosing && flyHandoff === handoff) {
+                DiagLog.i(ClusterFlyLog.TAG, "fly.display restore pending; mirror retained")
+            }
+        }, FLY_TEARDOWN_FALLBACK_MILLIS)
     }
 
     /**
@@ -2876,14 +2896,22 @@ class CarPlayHostActivity : ComponentActivity() {
     private val flySafetyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                ACTION_RADAR_STATUS ->
-                    clusterFly?.onRadar(intent.getIntExtra(EXTRA_RADAR_STATE, 0) == 1)
+                ACTION_RADAR_STATUS -> {
+                    // This receiver is exported so the factory's separate system app can reach it.
+                    // Ignore malformed payloads: a missing extra must never look like "radar off".
+                    val state = intent.getIntExtra(EXTRA_RADAR_STATE, INVALID_RADAR_STATE)
+                    if (state != 0 && state != 1) return
+                    val active = state == 1
+                    flyRadarActive = active
+                    clusterFly?.onRadar(active)
+                }
 
                 ACTION_ECALL_STATUS -> {
-                    val type = intent.getStringExtra(EXTRA_ECALL_TYPE)
-                    val status = intent.getStringExtra(EXTRA_ECALL_STATUS)
-                    val active = type == ECALL_TYPE &&
-                        (status == ECALL_SENDING || status == ECALL_INCOMING)
+                    val type = intent.getStringExtra(EXTRA_ECALL_TYPE) ?: return
+                    val status = intent.getStringExtra(EXTRA_ECALL_STATUS) ?: return
+                    if (type != ECALL_TYPE) return
+                    val active = status == ECALL_SENDING || status == ECALL_INCOMING
+                    flyEcallActive = active
                     clusterFly?.onEcall(active)
                 }
             }
@@ -3396,6 +3424,7 @@ class CarPlayHostActivity : ComponentActivity() {
         /** The factory's public safety broadcasts. Reversing has none; that is why it is unknown. */
         const val ACTION_RADAR_STATUS = "com.neusoft.radarDefanceView"
         const val EXTRA_RADAR_STATE = "state"
+        const val INVALID_RADAR_STATE = -1
         const val ACTION_ECALL_STATUS = "com.neusoft.ecallForThreeFinger"
         const val EXTRA_ECALL_TYPE = "CallType"
         const val EXTRA_ECALL_STATUS = "CallStatus"

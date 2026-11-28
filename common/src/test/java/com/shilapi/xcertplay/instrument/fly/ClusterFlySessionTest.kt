@@ -91,16 +91,45 @@ class ClusterFlySessionTest {
     fun `a display under radar is refused`() {
         session.onLeft(1_000L, openConditions())
         session.onWaitTimeout(3_000L)
-        session.onSafety(openConditions(radar = true), 3_050L)
+        val safety = session.onSafety(openConditions(radar = true), 3_050L)
+        assertFalse(safety.push)
+        assertEquals(FlyPhase.CLOSING, safety.phase)
+        assertEquals(FlyBlock.RADAR, safety.warning)
 
         val display = session.onDisplayReady(3_100L)
-
         assertFalse(display.push)
-        assertEquals(FlyPhase.WAITING_FOR_VIDEO, display.phase)
-        assertEquals(FlyBlock.RADAR, display.warning)
+        assertEquals(FlyPhase.CLOSING, display.phase)
     }
 
     /** A right swipe made too quickly still has to close the layer; it just has to wait. */
+    @Test
+    fun `radar while waiting withdraws the layer after it clears`() {
+        session.onLeft(1_000L, openConditions())
+        session.onWaitTimeout(3_000L)
+        val interrupted = session.onSafety(openConditions(radar = true), 3_050L)
+        assertEquals(FlyPhase.CLOSING, interrupted.phase)
+        assertFalse(interrupted.push)
+        assertTrue(interrupted.steps.isEmpty())
+
+        val cleared = session.onSafety(openConditions(millisSinceLastClusterCommand = 5_000), 6_000L)
+        assertEquals(FlyPhase.CLOSING, cleared.phase)
+        assertEquals(FlyCommand.FLY_RIGHT, cleared.steps.first().command)
+    }
+
+    @Test
+    fun `ecall while waiting withdraws the layer after it clears`() {
+        session.onLeft(1_000L, openConditions())
+        session.onWaitTimeout(3_000L)
+        val interrupted = session.onSafety(openConditions(ecall = true), 3_050L)
+        assertEquals(FlyPhase.CLOSING, interrupted.phase)
+        assertFalse(interrupted.push)
+        assertTrue(interrupted.steps.isEmpty())
+
+        val cleared = session.onSafety(openConditions(millisSinceLastClusterCommand = 5_000), 6_000L)
+        assertEquals(FlyPhase.CLOSING, cleared.phase)
+        assertEquals(FlyCommand.FLY_RIGHT, cleared.steps.first().command)
+    }
+
     @Test
     fun `a right inside one second still closes at the boundary`() {
         pushing()
@@ -147,6 +176,39 @@ class ClusterFlySessionTest {
         assertEquals(FlyPhase.CLOSING, cleared.phase)
         assertEquals(FlyCommand.FLY_RIGHT, cleared.steps.first().command)
         assertEquals(FlyCommand.NAV_BACK, cleared.steps.last().command)
+    }
+
+    @Test
+    fun `radar during arming cancels the pending open and withdraws navigation`() {
+        session.onLeft(1_000L, openConditions())
+
+        val interrupted = session.onSafety(openConditions(radar = true), 1_500L)
+
+        assertEquals(FlyPhase.IDLE, interrupted.phase)
+        assertFalse(interrupted.push)
+        assertEquals(FlyBlock.RADAR, interrupted.warning)
+        assertEquals(
+            listOf(FlyCommand.NAV_MODE_OFF, FlyCommand.NAV_OFF, FlyCommand.NAV_BACK),
+            interrupted.steps.map { it.command },
+        )
+        assertTrue(interrupted.steps.all { it.retraction })
+        assertEquals(FlyPhase.IDLE, session.onWaitTimeout(3_000L).phase)
+    }
+
+    @Test
+    fun `ecall during arming cancels the pending open and withdraws navigation`() {
+        session.onLeft(1_000L, openConditions())
+
+        val interrupted = session.onSafety(openConditions(ecall = true), 1_500L)
+
+        assertEquals(FlyPhase.IDLE, interrupted.phase)
+        assertFalse(interrupted.push)
+        assertEquals(FlyBlock.ECALL, interrupted.warning)
+        assertEquals(
+            listOf(FlyCommand.NAV_MODE_OFF, FlyCommand.NAV_OFF, FlyCommand.NAV_BACK),
+            interrupted.steps.map { it.command },
+        )
+        assertTrue(interrupted.steps.all { it.retraction })
     }
 
     @Test

@@ -127,11 +127,11 @@ def rejectPlaintextVendorPayload = tasks.register('rejectPlaintextVendorPayload'
 
 android {
     namespace = 'com.shilapi.xcertplay.shared'
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 19
-        targetSdk = 37
+        targetSdk = 36
         multiDexEnabled true
 
         ndk {

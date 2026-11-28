@@ -2,6 +2,8 @@ package com.shilapi.xcertplay.instrument.fly
 
 import android.view.Surface
 
+private const val MAX_RESTORE_ATTEMPTS = 3
+
 /**
  * Moves the centre decoder onto a texture and back.
  *
@@ -22,11 +24,15 @@ internal class FlyOutputHandoff(
     private var generation = 0
     private var phase = Phase.IDLE
     private val afterRestore = mutableListOf<() -> Unit>()
+    private var restoreExhausted = false
+    private var restoreInFlight = false
 
     fun begin(center: Surface, cluster: Surface, onReady: () -> Unit, onFailed: () -> Unit) {
         val ticket = ++generation
         this.center = center
         phase = Phase.DETACHING
+        restoreExhausted = false
+        restoreInFlight = false
         replaceOutput(null) { detached ->
             if (ticket != generation) return@replaceOutput
             onStep("detach", detached)
@@ -42,7 +48,6 @@ internal class FlyOutputHandoff(
                     if (ticket != generation) return@replaceOutput
                     onStep("attach", attached)
                     if (!attached) {
-                        closeMirror()
                         fail(ticket, onFailed)
                         return@replaceOutput
                     }
@@ -61,42 +66,76 @@ internal class FlyOutputHandoff(
             onDone()
             return
         }
+        afterRestore += onDone
         if (phase == Phase.RESTORING) {
-            afterRestore += onDone
+            // A previous bounded retry sequence may have exhausted. A later end() call
+            // serves as an explicit recovery trigger; never close EGL without success.
+            if (restoreExhausted && !restoreInFlight) {
+                val back = center ?: return
+                val ticket = generation
+                restoreExhausted = false
+                restoreCenter(ticket, back, closeAfterRestore = true)
+            }
             return
         }
         val ticket = ++generation
-        val back = center
         phase = Phase.RESTORING
+        val back = center
         if (back == null) {
             closeMirror()
-            finish(onDone)
+            finish()
             return
         }
-        replaceOutput(back) {
-            if (ticket != generation) return@replaceOutput
-            closeMirror()
-            finish(onDone)
-        }
+        restoreCenter(ticket, back, closeAfterRestore = true)
     }
 
     private fun fail(ticket: Int, onFailed: () -> Unit) {
-        val back = center
+        if (ticket != generation) return
+        afterRestore += onFailed
         phase = Phase.RESTORING
+        val back = center
         if (back == null) {
-            finish(onFailed)
+            finish()
             return
         }
-        replaceOutput(back) {
+        restoreCenter(ticket, back, closeAfterRestore = true)
+    }
+
+    /**
+     * Never tear down EGL while the decoder may still be writing into its texture.
+     * A rejected restore is retried; after attempts are exhausted, the mirror is retained.
+     * A later end() call can restart the bounded recovery sequence.
+     */
+    private fun restoreCenter(
+        ticket: Int,
+        back: Surface,
+        closeAfterRestore: Boolean,
+        attemptsLeft: Int = MAX_RESTORE_ATTEMPTS,
+    ) {
+        if (ticket != generation || restoreInFlight) return
+        restoreInFlight = true
+        replaceOutput(back) { restored ->
             if (ticket != generation) return@replaceOutput
-            finish(onFailed)
+            restoreInFlight = false
+            if (!restored) {
+                if (attemptsLeft > 1) {
+                    restoreCenter(ticket, back, closeAfterRestore, attemptsLeft - 1)
+                } else {
+                    restoreExhausted = true
+                }
+                return@replaceOutput
+            }
+            restoreExhausted = false
+            if (closeAfterRestore) closeMirror()
+            finish()
         }
     }
 
-    private fun finish(onDone: () -> Unit) {
+    private fun finish() {
         phase = Phase.IDLE
         center = null
-        onDone()
+        restoreExhausted = false
+        restoreInFlight = false
         val pending = afterRestore.toList()
         afterRestore.clear()
         pending.forEach { it() }

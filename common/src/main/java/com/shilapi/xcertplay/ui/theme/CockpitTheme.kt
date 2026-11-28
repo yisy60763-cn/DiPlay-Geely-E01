@@ -6,10 +6,11 @@ import com.shilapi.xcertplay.isDarkMode
 enum class AppSkin(val key: String) {
     ZEEKR_WHITE("zeekr_white"),
     FLYME_WHITE("flyme_white"),
-    NIGHT_DARK("night_dark");
+    NIGHT_DARK("night_dark"),
+    GEEK_DARK("geek_dark");
 
     companion object {
-        fun fromKey(key: String?): AppSkin = entries.find { it.key == key } ?: ZEEKR_WHITE
+        fun fromKey(key: String?): AppSkin = entries.find { it.key == key } ?: GEEK_DARK
     }
 }
 
@@ -100,9 +101,27 @@ object CockpitThemeManager {
         statusReady = 0xFF26D07C.toInt()
     )
 
+
+    val GEEK_DARK_PALETTE = ThemePalette(
+        screenBg = 0xFF080D14.toInt(),
+        dockBg = 0xFF0D1420.toInt(),
+        cardBg = 0xFF111C2B.toInt(),
+        cardInner = 0xFF172437.toInt(),
+        cardBorder = 0x6326364B,
+        textMain = 0xFFEAF2FF.toInt(),
+        textMuted = 0xFF91A4BC.toInt(),
+        accent = 0xFF00D1B2.toInt(),
+        accentSoft = 0x2600D1B2,
+        btnMainBg = 0xFF00D1B2.toInt(),
+        btnMainFg = 0xFF07131C.toInt(),
+        statusReady = 0xFF42D392.toInt()
+    )
+
     fun isNightHour(hour: Int): Boolean = hour >= 18 || hour < 6
 
     fun resolvePalette(skin: AppSkin, schedule: ThemeSchedule, uiMode: Int, currentHour: Int): ThemePalette {
+        // Geek is a fixed dark cockpit skin; automatic day/night schedules do not wash it out.
+        if (skin == AppSkin.GEEK_DARK) return GEEK_DARK_PALETTE
         val carDark = isDarkMode(uiMode)
         // The two automatic schedules are different answers to "who decides": the car's own
         // head-unit signal, or the clock. OR-ing them made both follow whichever said night first,
@@ -119,6 +138,7 @@ object CockpitThemeManager {
             AppSkin.ZEEKR_WHITE -> ZEEKR_WHITE_PALETTE
             AppSkin.FLYME_WHITE -> FLYME_WHITE_PALETTE
             AppSkin.NIGHT_DARK -> NIGHT_DARK_PALETTE
+            AppSkin.GEEK_DARK -> GEEK_DARK_PALETTE
         }
     }
 }

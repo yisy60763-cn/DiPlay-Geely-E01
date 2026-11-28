@@ -46,6 +46,7 @@ import com.shilapi.xcertplay.network.ManualHotspotManager
 import com.shilapi.xcertplay.network.PortHolders
 import com.shilapi.xcertplay.network.packageNameResolver
 import com.shilapi.xcertplay.carhop.CarBluetoothHops
+import com.shilapi.xcertplay.carhop.CarBluetoothTransportHop
 import com.shilapi.xcertplay.network.WirelessHotspotInfo
 import com.shilapi.xcertplay.network.WirelessHotspotBackend
 import com.shilapi.xcertplay.network.WirelessHotspotManager
@@ -1584,7 +1585,7 @@ class CarPlayController(
             val radioName = WirelessIdentityResolver.resolveRadioName(
                 link = link,
                 hopType = config.wirelessBluetoothHop,
-                fallbackCarHopName = CarBluetoothHops.active?.localName(appContext),
+                fallbackCarHopName = carBluetoothRadioName(),
             )
             debugLog("wireless radio name=$radioName")
             val identification = config.identification.copy(
@@ -2537,15 +2538,42 @@ class CarPlayController(
      * get from being late — the hotspot and the advertisement took tens of seconds before it was asked —
      * and taking that away without a retry would trade a slow failure for a wrong one.
      */
+    /**
+     * Resolve the radio name from the same Bluetooth route selected for this run. Blank vendor
+     * names are treated as absent so a source-only build can still use Android's adapter name.
+     */
+    private fun carBluetoothRadioName(
+        vendorHop: CarBluetoothTransportHop? = CarBluetoothHops.transport,
+    ): String? {
+        val vendorName = runCatching { vendorHop?.localName(appContext) }
+            .getOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+        if (vendorName != null) return vendorName
+        return runCatching { bluetoothAdapter?.name }
+            .getOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
     private fun requireCarHopRadioName() {
         if (config.wirelessBluetoothHop != WirelessBluetoothHop.CAR) return
-        val hop = CarBluetoothHops.active ?: throw WirelessIdentityResolver.missingNameException(
-            WirelessBluetoothHop.CAR,
-        )
+
+        // Match the route selected below: use the supplied E01 hop when this build has one for this
+        // head unit; otherwise use the same Android BluetoothAdapter that AndroidIap2BluetoothLink
+        // will use to open the RFCOMM socket. Requiring CarBluetoothHops.active unconditionally made
+        // the public/source-only build fail before it could reach its existing native RFCOMM path.
+        val vendorHop = CarBluetoothHops.transport?.takeIf {
+            runCatching { it.applies(appContext) }.getOrDefault(false)
+        }
         repeat(RADIO_NAME_ATTEMPTS) { attempt ->
-            val name = hop.localName(appContext)?.trim()?.takeIf { it.isNotEmpty() }
+            val name = carBluetoothRadioName(vendorHop)
             if (name != null) {
-                debugLog("wireless radio name (before the hotspot) =$name attempt=${attempt + 1}")
+                debugLog(
+                    "wireless radio name (before the hotspot) =$name " +
+                        "source=${if (vendorHop != null) "vendor-hop" else "android-adapter"} " +
+                        "attempt=${attempt + 1}",
+                )
                 return
             }
             if (attempt + 1 < RADIO_NAME_ATTEMPTS) {

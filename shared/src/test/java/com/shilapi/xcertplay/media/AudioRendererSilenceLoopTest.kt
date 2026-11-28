@@ -38,6 +38,15 @@ class AudioRendererSilenceLoopTest {
         return rtp
     }
 
+    /** Wait for the renderer's worker thread instead of assuming a fixed CI scheduling delay. */
+    private fun awaitCondition(description: String, timeoutMillis: Long = 3_000, condition: () -> Boolean) {
+        val deadline = System.nanoTime() + timeoutMillis * 1_000_000L
+        while (!condition() && System.nanoTime() < deadline) {
+            Thread.sleep(10)
+        }
+        assertTrue("等待超时：$description", condition())
+    }
+
     @Test
     fun packetStarvationMaintainsAudioTrackPlayingAndWritesSilence() {
         ShadowAudioTrack.resetTest()
@@ -63,8 +72,10 @@ class AudioRendererSilenceLoopTest {
                 sink.onAudioRtp(96, lpcmFormat(), rtpPacket(loudPcm), sample = seq * 480)
             }
 
-            // 等待工作线程处理并起播
-            Thread.sleep(150)
+            // 等待工作线程处理完队列并真正起播。固定 sleep 在较慢的 CI runner 上会误报。
+            awaitCondition("AudioTrack 创建并进入 PLAYSTATE_PLAYING") {
+                activeTrack?.playState == AudioTrack.PLAYSTATE_PLAYING
+            }
 
             val track = activeTrack
             assertTrue("AudioTrack 必须已经创建并开始播放", track != null)
@@ -87,26 +98,26 @@ class AudioRendererSilenceLoopTest {
             repeat(5) { seq ->
                 sink.onAudioRtp(96, lpcmFormat(), rtpPacket(loudPcm), sample = (65 + seq) * 480)
             }
-            Thread.sleep(100)
+            awaitCondition("新曲蓄水期间继续写入静音块") {
+                synchronized(writtenBuffers) {
+                    writtenBuffers.any { buf -> buf.isNotEmpty() && buf.all { it == 0.toByte() } }
+                }
+            }
 
             assertEquals("蓄水期间 AudioTrack 依然维持 PLAYING", AudioTrack.PLAYSTATE_PLAYING, track.playState)
-            val bufferingZeroWrites = synchronized(writtenBuffers) {
-                writtenBuffers.filter { buf -> buf.isNotEmpty() && buf.all { it == 0.toByte() } }
-            }
-            assertTrue("蓄水期间队列非空但门控未开，必须持续写入静音掩护声卡", bufferingZeroWrites.isNotEmpty())
 
             // 4. 继续注入剩余数据包直至蓄满 60 包 (5 + 60 = 65 >= 60 门限)，触发开闸起播
             writtenBuffers.clear()
             repeat(60) { seq ->
                 sink.onAudioRtp(96, lpcmFormat(), rtpPacket(loudPcm), sample = (70 + seq) * 480)
             }
-            Thread.sleep(150)
+            awaitCondition("新曲开闸后恢复真实 PCM 写入") {
+                synchronized(writtenBuffers) {
+                    writtenBuffers.any { buf -> buf.any { it != 0.toByte() } }
+                }
+            }
 
             assertEquals("恢复后 AudioTrack 依然保持 PLAYING", AudioTrack.PLAYSTATE_PLAYING, track.playState)
-            val resumedWrites = synchronized(writtenBuffers) {
-                writtenBuffers.filter { buf -> buf.any { it != 0.toByte() } }
-            }
-            assertTrue("恢复后必须能继续写入真实声音", resumedWrites.isNotEmpty())
 
         } finally {
             sink.onAudioStopped(96)

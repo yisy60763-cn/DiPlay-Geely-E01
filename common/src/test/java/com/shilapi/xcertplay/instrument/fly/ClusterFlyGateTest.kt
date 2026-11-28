@@ -43,6 +43,21 @@ class ClusterFlyGateTest {
     }
 
     @Test
+    fun `close is allowed after navigation or provisioning has ended`() {
+        assertEquals(
+            FlyBlock.NONE,
+            ClusterFlyGate.decideClose(openConditions(navigationArmed = false, deviceProvisioned = false)),
+        )
+    }
+
+    @Test
+    fun `close still respects safety interlocks`() {
+        assertEquals(FlyBlock.RADAR, ClusterFlyGate.decideClose(openConditions(radar = true)))
+        assertEquals(FlyBlock.ECALL, ClusterFlyGate.decideClose(openConditions(ecall = true)))
+        assertEquals(FlyBlock.REVERSING, ClusterFlyGate.decideClose(openConditions(reversing = true)))
+    }
+
+    @Test
     fun `clear conditions pass`() {
         assertEquals(FlyBlock.NONE, ClusterFlyGate.decide(openConditions()))
         assertEquals(null, ClusterFlyWarning.text(FlyBlock.NONE))

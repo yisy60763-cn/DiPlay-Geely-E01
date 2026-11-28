@@ -1,8 +1,7 @@
 #!/bin/sh
 # Build the Geely E01 packages and name them DiPlay-Legacy-Geely-V<version>[-local].apk
 #
-#   official  the package that is handed out: the car hop, and none of the features that are still
-#             being tried on the car
+#   official  the package that is handed out, using the native CAR route unless a vendor hop is supplied
 #   local     the same package plus -Pexperimental=on: the experimental features, and with them the
 #             log-upload key
 #
@@ -16,7 +15,7 @@
 # a package contained.
 #
 #   DIPLAY_AUTH_ASSETS_DIR   default ~/.diplay-auth-assets    (offline-mfi identity). Required.
-#   DIPLAY_VENDOR_HOP_DIR    no default                       (the car hop). Required.
+#   DIPLAY_VENDOR_HOP_DIR    optional                         (vendor-specific Bluetooth override).
 #
 # The signing key stays a variable: a password on a command line is readable by anything that can list
 # processes, and Gradle records -P values in its own caches.
@@ -40,10 +39,9 @@ hop_dir=${DIPLAY_VENDOR_HOP_DIR:-}
 
 [ -f "$auth_dir/offline-mfi/identity.pk8" ] || {
     echo "package-geely: $auth_dir/offline-mfi/identity.pk8 is missing" >&2; exit 1; }
-# Neither package is built without the hop: one without it runs the AOSP stack and connects to nothing,
-# and handing that out is the failure this script exists to make impossible.
-[ -n "$hop_dir" ] || {
-    echo "package-geely: set DIPLAY_VENDOR_HOP_DIR; both packages carry the car hop" >&2; exit 1; }
+# A vendor hop is optional. Without it the CAR route uses AndroidIap2BluetoothLink and the
+# head unit's own Android Bluetooth stack. The explicit accessory identity and release signing
+# material remain required; this script does not create or source either one.
 
 # Gradle refuses a stale one of these outright, and that refusal is what makes translating here the
 # only way in. This script's own copies are taken above and are not passed on. DIPLAY_CLOUD_LOGS and
@@ -72,8 +70,13 @@ build() {
     [ -n "${ANDROID_KEY_PASSWORD:-}" ] || {
         echo "package-geely: no release key password" >&2; exit 1; }
     export ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD ANDROID_KEYSTORE_PATH ANDROID_KEY_ALIAS
-    (cd "$root" && sh gradlew -PauthAssetsDir="$auth_dir" -PvendorHopDir="$hop_dir" \
-        -Pexperimental="$experimental" :mobile:assembleStandaloneRelease)
+    if [ -n "$hop_dir" ]; then
+        (cd "$root" && sh gradlew -PauthAssetsDir="$auth_dir" -PvendorHopDir="$hop_dir" \
+            -Pexperimental="$experimental" :mobile:assembleStandaloneRelease)
+    else
+        (cd "$root" && sh gradlew -PauthAssetsDir="$auth_dir" \
+            -Pexperimental="$experimental" :mobile:assembleStandaloneRelease)
+    fi
     cp "$root/mobile/build/outputs/apk/release/mobile-release.apk" "$out/DiPlay-Legacy-Geely-$tag$suffix.apk"
     echo "→ $out/DiPlay-Legacy-Geely-$tag$suffix.apk"
 }

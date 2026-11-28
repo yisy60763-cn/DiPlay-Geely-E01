@@ -9,6 +9,19 @@ import org.junit.Assert.assertFalse
 import java.nio.ByteBuffer
 
 class MediaCodecSupportTest {
+    @Test fun aacAccessUnitRejectsTruncatedAndEmptyPayloads() {
+        // AU-size occupies the upper 13 bits of the AU-header (in bits, not bytes).
+        val truncated = byteArrayOf(0, 16, 0, 32, 0x11, 0x22, 0x33)
+        assertEquals(0, MediaCodecSupport.aacAccessUnit(truncated).size)
+
+        val empty = byteArrayOf(0, 16, 0, 0, 0x11, 0x22)
+        assertEquals(0, MediaCodecSupport.aacAccessUnit(empty).size)
+    }
+
+    @Test fun aacAccessUnitExtractsDeclaredPayloadWithoutTrailingBytes() {
+        val payload = byteArrayOf(0, 16, 0, 16, 0x11, 0x22, 0x33)
+        assertArrayEquals(byteArrayOf(0x11, 0x22), MediaCodecSupport.aacAccessUnit(payload))
+    }
     @Test fun truncatedAccessUnitIsRejectedInsteadOfSubmittingItsValidPrefix() {
         assertEquals(0, MediaCodecSupport.toAnnexB(byteArrayOf(0, 0, 0, 2, 0x41, 1, 0, 0, 0, 9, 0x41)).size)
         assertEquals(0, MediaCodecSupport.toAnnexB(byteArrayOf(0, 0, 0, 2, 0x41, 1, 0)).size)

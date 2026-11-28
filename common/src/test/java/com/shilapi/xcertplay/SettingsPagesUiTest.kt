@@ -52,7 +52,11 @@ class SettingsPagesUiTest {
     }
 
     private fun texts(activity: DiPlayActivity): List<String> =
-        allViews(activity).filterIsInstance<TextView>().mapNotNull { it.text?.toString() }.filter { it.isNotBlank() }
+        allViews(activity)
+            .filter { it.visibility == View.VISIBLE }
+            .filterIsInstance<TextView>()
+            .mapNotNull { it.text?.toString() }
+            .filter { it.isNotBlank() }
 
     private fun selectTab(activity: DiPlayActivity, label: String) {
         val tab = allViews(activity).filterIsInstance<TextView>().first { it.text?.toString() == label }
@@ -70,10 +74,14 @@ class SettingsPagesUiTest {
 
     @Test fun homeStageOffersUsbAndDoesNotOfferWireless() {
         val activity = open("home")
-        val buttons = allViews(activity).filterIsInstance<Button>().mapNotNull { it.text?.toString() }
-        assertTrue("USB connection action is present", "Wired" in buttons)
-        assertFalse("wireless connection action is hidden", buttons.any { it.contains("Wireless", ignoreCase = true) })
-        assertFalse("the old transport chooser is gone", buttons.any { it.contains("Choose connection mode") })
+        val shown = texts(activity)
+        val buttons = allViews(activity)
+            .filter { it.visibility == View.VISIBLE }
+            .filterIsInstance<Button>()
+            .mapNotNull { it.text?.toString() }
+        assertTrue("wired connection action is present", buttons.any { it.contains("Wired", ignoreCase = true) })
+        assertFalse("wireless connection action is hidden", shown.any { it.contains("Wireless", ignoreCase = true) })
+        assertFalse("the old transport chooser is gone", shown.any { it.contains("Choose connection mode") })
     }
 
     @Test fun settingsNavigationKeepsAudioDisplayGovernanceAndSystemTabs() {

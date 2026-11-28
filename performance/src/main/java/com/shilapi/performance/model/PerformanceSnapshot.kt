@@ -81,7 +81,7 @@ data class PerformanceSnapshot(
             if (media == null) return "投屏: 待机"
             val touch = if (media.touchLatencyMs >= 0) " · 延迟: ${media.touchLatencyMs}ms" else ""
             val refresh = if (media.displayRefreshHz > 0f) {
-                String.format(Locale.US, " · 屏幕 %.0fHz", media.displayRefreshHz)
+                String.format(Locale.US, " · 屏幕刷新率 %.0fHz", media.displayRefreshHz)
             } else ""
             return String.format(
                 Locale.US,

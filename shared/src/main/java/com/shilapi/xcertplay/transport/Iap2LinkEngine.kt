@@ -86,6 +86,11 @@ class Iap2LinkEngine(
                 if (bytes.size < SYNCHRONIZATION_FIXED_BYTES || u8(bytes[0]) != SYNCHRONIZATION_VERSION) {
                     return null
                 }
+                // Each advertised session is exactly three bytes (id, kind, version). Do not
+                // silently accept a truncated descriptor at the end of an otherwise valid sync.
+                if ((bytes.size - SYNCHRONIZATION_FIXED_BYTES) % SESSION_DESCRIPTOR_BYTES != 0) {
+                    return null
+                }
                 val descriptors = ArrayList<SessionDescriptor>()
                 var offset = SYNCHRONIZATION_FIXED_BYTES
                 while (offset + SESSION_DESCRIPTOR_BYTES <= bytes.size) {

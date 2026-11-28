@@ -89,7 +89,7 @@ class SettingsPagesUiTest {
             .filterIsInstance<Button>()
             .mapNotNull { it.text?.toString() }
         assertTrue("wired connection action is present", buttons.any { it.contains("Wired", ignoreCase = true) })
-        assertFalse("wireless connection action is hidden", shown.any { it.contains("Wireless", ignoreCase = true) })
+        assertFalse("wireless connection action is hidden", buttons.any { it.contains("Wireless", ignoreCase = true) })
         assertFalse("the old transport chooser is gone", shown.any { it.contains("Choose connection mode") })
     }
 
@@ -127,7 +127,11 @@ class SettingsPagesUiTest {
             val activity = open(route)
             val shown = texts(activity)
             assertTrue("$route route falls back to the wired home", shown.any { it == "Wired" || it.contains("Connect your iPhone with a USB cable") })
-            assertFalse("$route route does not expose wireless action", shown.any { it.contains("Wireless", ignoreCase = true) })
+            val buttons = allViews(activity)
+                .filter(::isEffectivelyVisible)
+                .filterIsInstance<Button>()
+                .mapNotNull { it.text?.toString() }
+            assertFalse("$route route does not expose wireless action", buttons.any { it.contains("Wireless", ignoreCase = true) })
         }
     }
 

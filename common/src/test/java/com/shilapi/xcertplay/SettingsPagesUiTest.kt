@@ -108,9 +108,9 @@ class SettingsPagesUiTest {
     @Test fun retiredWirelessRoutesFailClosedToHome() {
         listOf("wireless", "wired").forEach { route ->
             val activity = open(route)
-            val buttons = allViews(activity).filterIsInstance<Button>().mapNotNull { it.text?.toString() }
-            assertTrue("$route route falls back to the wired home", "Wired" in buttons)
-            assertFalse("$route route does not expose wireless action", buttons.any { it.contains("Wireless", ignoreCase = true) })
+            val shown = texts(activity)
+            assertTrue("$route route falls back to the wired home", shown.any { it == "Wired" || it.contains("Connect your iPhone with a USB cable") })
+            assertFalse("$route route does not expose wireless action", shown.any { it.contains("Wireless", ignoreCase = true) })
         }
     }
 

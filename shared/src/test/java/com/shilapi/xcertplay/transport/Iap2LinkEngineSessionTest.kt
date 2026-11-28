@@ -7,6 +7,19 @@ import org.junit.Test
 class Iap2LinkEngineSessionTest {
 
     @Test
+    fun synchronizationPayloadRejectsTruncatedSessionDescriptor() {
+        val validFixedHeader = byteArrayOf(
+            0x01, 0x7f, 0xff.toByte(), 0xff.toByte(),
+            0x0f, 0xa0.toByte(), 0x01, 0xf4.toByte(), 0x04, 0x03,
+        )
+        assertEquals(null, Iap2LinkEngine.SynchronizationPayload.decode(validFixedHeader + byteArrayOf(0x0a, 0x00)))
+        assertEquals(
+            1,
+            Iap2LinkEngine.SynchronizationPayload.decode(validFixedHeader + byteArrayOf(0x0a, 0x00, 0x02))?.sessions?.size,
+        )
+    }
+
+    @Test
     fun controlSessionOnlySyncFrameDeclaresJustTheControlSession() {
         val engine = Iap2LinkEngine(Iap2LinkConfig(declareOptionalSessions = false))
         engine.start(wiredInitiator = false, nowMillis = 0)

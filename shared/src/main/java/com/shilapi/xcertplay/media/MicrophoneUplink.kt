@@ -27,14 +27,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 @android.annotation.SuppressLint("MissingPermission")
 internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeable {
     private val running = AtomicBoolean(false)
+    private val lifecycleLock = Any()
     private val firstPacketLogged = AtomicBoolean(false)
     @Volatile private var recorder: AudioRecord? = null
     @Volatile private var socket: DatagramSocket? = null
     @Volatile private var opusEncoder: OpusEncoder? = null
     private var thread: Thread? = null
 
-    fun start(): Boolean {
-        if (!running.compareAndSet(false, true)) return true
+    fun start(): Boolean = synchronized(lifecycleLock) {
+        if (!running.compareAndSet(false, true)) return@synchronized true
 
         val channelMask = if (config.channels >= 2) {
             AndroidAudioFormat.CHANNEL_IN_STEREO
@@ -49,7 +50,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
         if (minBuffer <= 0) {
             DiagLog.w(TAG, "microphone unavailable rate=${config.sampleRate} channels=${config.channels}")
             running.set(false)
-            return false
+            return@synchronized false
         }
 
         val source = when (config.audioType) {
@@ -225,27 +226,29 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
     }
 
     override fun close() {
-        if (!running.compareAndSet(true, false)) {
-            release()
-            return
+        val resources = synchronized(lifecycleLock) {
+            running.set(false)
+            Triple(recorder, socket, thread)
         }
         try {
-            recorder?.stop()
+            resources.first?.stop()
         } catch (_: Exception) {
             // Best effort; release below is authoritative.
         }
         try {
-            socket?.close()
+            resources.second?.close()
         } catch (_: Exception) {
             // Best effort.
         }
-        thread?.let { worker ->
-            try {
-                worker.join(CLOSE_JOIN_MILLIS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
+        resources.third?.let { worker ->
+            if (worker !== Thread.currentThread()) {
+                try {
+                    worker.join(CLOSE_JOIN_MILLIS)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                }
+                if (worker.isAlive) worker.interrupt()
             }
-            if (worker.isAlive) worker.interrupt()
         }
         release()
     }

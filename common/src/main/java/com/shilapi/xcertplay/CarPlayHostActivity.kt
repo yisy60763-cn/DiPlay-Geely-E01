@@ -414,15 +414,12 @@ class CarPlayHostActivity : ComponentActivity() {
     private var microphoneAvailable = false
     private var microphonePermissionResolved = false
     /**
-     * The transport this page is for, fixed when the page is created. The choice is made on the
-     * DiPlay home screen; nothing on this page may change it, or the ladder and the handshake could
-     * be looking at two different transports.
-     *
-     * Lazy on purpose: Android builds an activity before it attaches a base context, so a property
-     * initializer that reads a preference runs against a null one and takes the app down as the screen
-     * opens. The first read is in [onCreate], by which point the context is attached.
+     * This E01 deployment is deliberately wired-only. Do not let a stale preference from an older
+     * installation switch the controller back to Wi-Fi/Bluetooth transport. Keeping this as a build
+     * constant also means startup never enters wireless permission, hotspot or radio-management
+     * paths; the USB/NCM network carried over the cable remains part of wired CarPlay.
      */
-    private val wirelessEnabled by lazy { AirPlayPersistence.loadWirelessEnabled(this) }
+    private val wirelessEnabled: Boolean = false
     private var mfiTarget = MfiTarget.USB_CH341
     private var mfiI2cPath = AirPlayPersistence.DEFAULT_MFI_I2C_PATH
     private var remoteMfiServer = ""

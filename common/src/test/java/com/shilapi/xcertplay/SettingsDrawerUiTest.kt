@@ -66,13 +66,13 @@ class SettingsDrawerUiTest {
     }
 
     /** The settings screen's own words: a rail tab title, and the active content section. */
-    private val drawerWords = listOf("System settings", "Wireless settings")
+    private val drawerWords = listOf("Connection", "System settings")
 
     /**
      * The cockpit, recognised by its main button. It used to say "Connect phone"; now that wired and
      * wireless are a choice rather than a default, a fresh page asks which one.
      */
-    private val cockpitWord = "Choose connection mode: wired or wireless"
+    private val cockpitWord = "Wired"
 
     @Test
     fun theSwipeOpensTheDrawerOnTheCockpit() {

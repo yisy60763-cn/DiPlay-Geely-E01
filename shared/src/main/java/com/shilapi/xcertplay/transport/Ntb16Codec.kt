@@ -56,32 +56,45 @@ object Ntb16Codec {
         require(offset >= 0 && length >= 0 && offset <= block.size - length) {
             "NTB16 range is outside the source buffer"
         }
-        val end = offset + length
         if (length < NTH_LENGTH || readU32(block, offset) != NTH16_SIG) return emptyList()
+        if (readU16(block, offset + 4) != NTH_LENGTH) return emptyList()
+        val blockLength = readU16(block, offset + 8)
+        if (blockLength < NTH_LENGTH || blockLength > length) return emptyList()
+        val end = offset + blockLength
 
         val datagrams = ArrayList<ByteArray>(1)
-        var ndpOffset = offset + readU16(block, offset + 10)
+        val ndpIndex = readU16(block, offset + 10)
+        if (ndpIndex < NTH_LENGTH || ndpIndex >= blockLength) return emptyList()
+        var ndpOffset = offset + ndpIndex
         var hops = 0
-        val maxHops = maxOf(1, length / 4)
+        val maxHops = maxOf(1, blockLength / 4)
         while (ndpOffset != 0 && hops < maxHops) {
-            if (ndpOffset < offset || ndpOffset + 12 > end) break
-            if (readU32(block, ndpOffset) and 0x00ffffff != NDP16_SIG and 0x00ffffff) break
+            if (ndpOffset < offset + NTH_LENGTH || ndpOffset + 8 > end) break
+            if (readU32(block, ndpOffset) != NDP16_SIG) break
             val ndpLength = readU16(block, ndpOffset + 4)
+            if (ndpLength < 12 || ndpOffset + ndpLength > end) break
             val nextNdp = readU16(block, ndpOffset + 6)
             var entry = ndpOffset + 8
-            val ndpEnd = minOf(ndpOffset + ndpLength, end)
+            val ndpEnd = ndpOffset + ndpLength
             while (entry + 4 <= ndpEnd) {
                 val datagramIndex = readU16(block, entry)
                 val datagramLength = readU16(block, entry + 2)
                 if (datagramIndex == 0 || datagramLength == 0) break
                 val datagramStart = offset + datagramIndex
                 val datagramEnd = datagramStart + datagramLength
-                if (datagramStart >= offset && datagramStart <= end && datagramEnd <= end) {
+                if (
+                    datagramIndex >= NTH_LENGTH &&
+                    datagramStart >= offset &&
+                    datagramEnd <= end &&
+                    datagramEnd > datagramStart
+                ) {
                     datagrams.add(block.copyOfRange(datagramStart, datagramEnd))
                 }
                 entry += 4
             }
-            ndpOffset = if (nextNdp == 0) 0 else offset + nextNdp
+            if (nextNdp == 0) break
+            if (nextNdp < NTH_LENGTH || nextNdp >= blockLength) break
+            ndpOffset = offset + nextNdp
             hops++
         }
         return datagrams

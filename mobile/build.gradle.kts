@@ -153,28 +153,13 @@ val verifyStandaloneAuthentication by tasks.registering {
 tasks.named("preBuild") { mustRunAfter(verifyStandaloneAuthentication) }
 tasks.register("assembleStandaloneRelease") {
     group = "build"
-    description = "Build a package to hand out: the car hop and an explicitly provisioned identity."
+    description = "Build a standalone package with an explicit accessory identity; the vendor hop is optional."
     dependsOn(verifyStandaloneAuthentication, "assembleRelease")
 }
 
-// The car hop is compiled in only when -PvendorHopDir names it. Both packages this project hands out
-// carry it — the difference between them is -Pexperimental and nothing else — so the standalone build
-// asks for it, and a hop-less package is not one of the two.
-val verifyVendorHop by tasks.registering {
-    group = "verification"
-    description = "Require the car hop for a standalone car APK."
-    val directory = gradle.startParameter.projectProperties["vendorHopDir"]?.let { file(it) }
-    doLast {
-        check(directory != null) {
-            "Standalone car builds require -PvendorHopDir=<path>; without it the APK carries no car hop."
-        }
-        check(directory.resolve("src/com/shilapi/xcertplay/carhop/VendorCarHop.kt").isFile) {
-            "-PvendorHopDir=${directory} does not hold the car hop source."
-        }
-    }
-}
-tasks.named("preBuild") { mustRunAfter(verifyVendorHop) }
-tasks.named("assembleStandaloneRelease") { dependsOn(verifyVendorHop) }
+// The vendor hop is an optional transport override. When it is absent, CarPlayController uses
+// AndroidIap2BluetoothLink for the CAR route through the head unit's own Android Bluetooth stack.
+// A supplied -PvendorHopDir still adds the vendor implementation and its native payload.
 
 // There is no adapter check here any more. The adapter stack was compiled in by -PadapterDir and this
 // file used to require it for the standalone build; neither package carries one now, so a check that

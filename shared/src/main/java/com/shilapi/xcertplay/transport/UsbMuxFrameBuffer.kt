@@ -10,19 +10,34 @@ internal data class UsbMuxFrame(
 
 /** Incremental framing; callers serialize access with their USBMUX state lock. */
 internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) {
-    private var bytes = ByteArray(0)
+    // Keep spare capacity between USB completions. The old `bytes += transfer` copied the entire
+    // partial frame on every small bulk read; on the E01 this created avoidable allocation/GC
+    // pressure while Lockdown replies were fragmented. bufferedSize is the only live byte range.
+    private var bytes = ByteArray(INITIAL_CAPACITY)
+    private var bufferedSize = 0
     private var optionalReplyPadding: UsbMuxFrame? = null
     private var paddingReports = 0
     private var lastUsbReadBytes = 0
-    val bufferedBytes: Int get() = bytes.size
+    val bufferedBytes: Int get() = bufferedSize
 
     fun append(transfer: ByteArray) {
         lastUsbReadBytes = transfer.size
-        bytes += transfer
+        if (transfer.isEmpty()) return
+        val required = bufferedSize + transfer.size
+        if (required > bytes.size) {
+            var capacity = bytes.size
+            while (capacity < required) capacity = (capacity * 2).coerceAtMost(MAX_BUFFER_BYTES)
+            if (capacity < required) {
+                throw IphoneUsbException.Protocol("USBMUX receive buffer exceeds $MAX_BUFFER_BYTES bytes")
+            }
+            bytes = bytes.copyOf(capacity)
+        }
+        transfer.copyInto(bytes, destinationOffset = bufferedSize)
+        bufferedSize = required
     }
 
     fun takeFrame(): UsbMuxFrame? {
-        if (bytes.size < HEADER_BYTES) return null
+        if (bufferedSize < HEADER_BYTES) return null
         var length = readU32(bytes, 4)
         if (length !in HEADER_BYTES..MAX_FRAME_BYTES) {
             val previous = optionalReplyPadding
@@ -34,7 +49,7 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
             // Wait for the candidate MUX/TCP headers or complete diagnostic payload. A timeout
             // leaves these bytes in place; a legitimate split frame must never be lost.
             if (previous != null && readU32(bytes, 0) != PROTOCOL_TCP &&
-                bytes.size < PADDING_BYTES + HEADER_BYTES) return null
+                bufferedSize < PADDING_BYTES + HEADER_BYTES) return null
             val followingProtocol = readU32(bytes, PADDING_BYTES)
             val followingLength = readU32(bytes, PADDING_BYTES + 4)
             val candidateHeader = previous != null && readU32(bytes, 0) != PROTOCOL_TCP &&
@@ -42,7 +57,7 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
             val validTarget = when {
                 candidateHeader && followingProtocol == PROTOCOL_TCP &&
                     followingLength in (HEADER_BYTES + TCP_HEADER_BYTES)..MAX_FRAME_BYTES -> {
-                    if (bytes.size < PADDING_BYTES + HEADER_BYTES + TCP_HEADER_BYTES) return null
+                    if (bufferedSize < PADDING_BYTES + HEADER_BYTES + TCP_HEADER_BYTES) return null
                     val tcpHeaderBytes = ((bytes[PADDING_BYTES + HEADER_BYTES + 12].toInt() ushr 4) and 0x0f) * 4
                     tcpHeaderBytes in TCP_HEADER_BYTES..(followingLength - HEADER_BYTES) &&
                         readU16(bytes, PADDING_BYTES + HEADER_BYTES) != 0 &&
@@ -53,19 +68,20 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
                     // Issue #100 also captures four extra bytes before/after protocol 1.
                     // Validate its entire bounded subtype/text payload before recovering.
                     // A timeout leaves the trailer and incomplete frame untouched.
-                    if (bytes.size < PADDING_BYTES + followingLength) return null
+                    if (bufferedSize < PADDING_BYTES + followingLength) return null
                     isCapturedDiagnosticPayload(bytes, PADDING_BYTES + HEADER_BYTES, followingLength - HEADER_BYTES)
                 }
                 else -> false
             }
             if (previous != null && validTarget) {
-                bytes = bytes.copyOfRange(PADDING_BYTES, bytes.size)
+                bytes = bytes.copyOfRange(PADDING_BYTES, bufferedSize)
+                bufferedSize = bytes.size
                 optionalReplyPadding = null
                 if (paddingReports++ < MAX_PADDING_REPORTS) report(
                     "USBMUX optional reply padding skipped bytes=$PADDING_BYTES " +
                         "previousProtocol=${previous.protocol} previousLength=${previous.length} " +
                         "nextProtocol=$followingProtocol nextLength=$followingLength " +
-                        "lastUsbReadBytes=$lastUsbReadBytes bufferedBytes=${bytes.size}")
+                        "lastUsbReadBytes=$lastUsbReadBytes bufferedBytes=$bufferedSize")
                 if (bytes.size < HEADER_BYTES) return null
                 length = readU32(bytes, 4)
             } else {
@@ -74,13 +90,14 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
                 throw IphoneUsbException.Protocol("Invalid USBMUX frame length $length")
             }
         }
-        if (bytes.size < length) return null
+        if (bufferedSize < length) return null
         val frame = UsbMuxFrame(
             protocol = readU32(bytes, 0), length = length, word8 = readU32(bytes, 8),
             sequence = ((bytes[12].toInt() and 0xff) shl 8) or (bytes[13].toInt() and 0xff),
             payload = bytes.copyOfRange(HEADER_BYTES, length),
         )
-        bytes = bytes.copyOfRange(length, bytes.size)
+        bytes = bytes.copyOfRange(length, bufferedSize)
+        bufferedSize = bytes.size
         optionalReplyPadding = frame.takeIf(::canHaveOptionalReplyPadding)
         return frame
     }
@@ -115,6 +132,8 @@ internal class UsbMuxFrameBuffer(private val diagnostic: (String) -> Unit = {}) 
 
     private companion object {
         const val HEADER_BYTES = 16
+        const val INITIAL_CAPACITY = 256
+        const val MAX_BUFFER_BYTES = 65_540
         const val TCP_HEADER_BYTES = 20
         const val MAX_FRAME_BYTES = 65_536
         const val VERSION_BYTES = 20

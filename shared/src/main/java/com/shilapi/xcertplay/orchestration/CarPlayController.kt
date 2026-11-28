@@ -266,6 +266,14 @@ internal fun isWirelessHandoffInProgress(
     sessionActive: Boolean,
 ): Boolean = handoffRequested || tunnelActive || sessionActive
 
+/** A USBMUX open may finish after the phone has been detached; stale attempts must not advance. */
+internal fun isWiredDataPathAttemptCurrent(
+    closed: Boolean,
+    phaseIsDataPaths: Boolean,
+    expectedGeneration: Int,
+    currentGeneration: Int,
+): Boolean = !closed && phaseIsDataPaths && expectedGeneration == currentGeneration
+
 /**
  * True when [error], or anything it wraps, carries the Lockdown error code [code].
  *
@@ -380,6 +388,8 @@ class CarPlayController(
     @Volatile private var uiStatusReporter: ((CarPlayStatus) -> Unit)? = reportStatus
     private val permissionGrant = AtomicBoolean(false)
     private val availabilityPollGeneration = AtomicInteger(0)
+    /** Invalidates asynchronous USBMUX/NCM opens when the phone leaves during data-path bring-up. */
+    private val wiredBringUpGeneration = AtomicInteger(0)
     private var permissionPollGeneration = 0
     private var reenumerationAttempts = 0
     private var lastReportedStatus: CarPlayStatus? = null
@@ -772,6 +782,7 @@ class CarPlayController(
         }
         closeReceivers()
         availabilityPollGeneration.incrementAndGet()
+        wiredBringUpGeneration.incrementAndGet()
         wirelessGeneration.incrementAndGet()
         permissionPollGeneration += 1
         touchDispatch.clear()
@@ -2041,6 +2052,7 @@ class CarPlayController(
     }
 
     private fun startIphone() {
+        wiredBringUpGeneration.incrementAndGet()
         availabilityPollGeneration.incrementAndGet()
         phase = Phase.IPHONE
         reenumerationAttempts = 0
@@ -2239,7 +2251,13 @@ class CarPlayController(
     private fun onIphoneDetached(device: UsbDevice) {
         if (closed) return
         debugLog("wired usb/detach " + describeAppleUsbDevice(device))
-        when (phase) {
+        // Serialize the detach decision with runStack's DATAPATHS -> CONTROL transition. If
+        // detach wins, the pending open is invalidated; if runStack wins, normal live-session
+        // teardown handles the physical loss.
+        val detachedPhase = synchronized(lifecycleLock) {
+            phase.also { if (it == Phase.DATAPATHS) wiredBringUpGeneration.incrementAndGet() }
+        }
+        when (detachedPhase) {
             Phase.REENUMERATION -> Unit
             Phase.IPHONE -> {
                 WiredLinkCycles.shared.noteDetach(System.nanoTime())
@@ -2329,22 +2347,44 @@ class CarPlayController(
     private fun openDataPaths(device: UsbDevice) {
         wiredFaultRecorder.reset()
         wiredLivenessStats.reset()
-        phase = Phase.DATAPATHS
+        val generation = synchronized(lifecycleLock) {
+            phase = Phase.DATAPATHS
+            wiredBringUpGeneration.incrementAndGet()
+        }
         debugLog("wired opening iPhone USB data paths")
         onStatus(CarPlayStatus.SelectingConfiguration)
         onStatus(CarPlayStatus.OpeningDataPaths)
         iphoneHost.openIap2UsbSessionAsync(device, executor) { result ->
+            val current = {
+                isWiredDataPathAttemptCurrent(
+                    closed = closed,
+                    phaseIsDataPaths = phase == Phase.DATAPATHS,
+                    expectedGeneration = generation,
+                    currentGeneration = wiredBringUpGeneration.get(),
+                )
+            }
             when (result) {
                 is IphoneUsbHost.Iap2SessionResult.Connected -> {
+                    if (!current()) {
+                        closeBestEffort("stale USBMUX session") { result.session.close() }
+                        return@openIap2UsbSessionAsync
+                    }
+                    var ncm: NcmUsbBridge? = null
                     try {
-                        val ncm = openNcm(device)
-                        runStack(result.session, ncm)
+                        ncm = openNcm(device)
+                        if (!current()) {
+                            closeBestEffort("stale NCM bridge") { ncm.close() }
+                            closeBestEffort("stale USBMUX session") { result.session.close() }
+                            return@openIap2UsbSessionAsync
+                        }
+                        runStack(result.session, ncm, generation)
                     } catch (error: Throwable) {
-                        result.session.close()
-                        fail(error)
+                        ncm?.let { closeBestEffort("failed NCM bridge") { it.close() } }
+                        closeBestEffort("failed USBMUX session") { result.session.close() }
+                        if (current()) fail(error)
                     }
                 }
-                is IphoneUsbHost.Iap2SessionResult.Failed -> fail(result.error)
+                is IphoneUsbHost.Iap2SessionResult.Failed -> if (current()) fail(result.error)
             }
         }
     }
@@ -2373,8 +2413,27 @@ class CarPlayController(
         )
     }
 
-    private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge) {
-        phase = Phase.CONTROL
+    private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge, generation: Int) {
+        // The detach receiver and this transition share lifecycleLock. That closes the final
+        // check/use gap: a detach either invalidates this attempt first, or observes CONTROL and
+        // lets the established live-session failure path tear it down.
+        val mayStartControl = synchronized(lifecycleLock) {
+            if (isWiredDataPathAttemptCurrent(
+                    closed = closed,
+                    phaseIsDataPaths = phase == Phase.DATAPATHS,
+                    expectedGeneration = generation,
+                    currentGeneration = wiredBringUpGeneration.get(),
+                )
+            ) {
+                phase = Phase.CONTROL
+                true
+            } else false
+        }
+        if (!mayStartControl) {
+            closeBestEffort("stale NCM bridge") { ncm.close() }
+            closeBestEffort("stale USBMUX session") { usbSession.close() }
+            return
+        }
         var ncmOwnedLocally = true
         try {
             if (closed) return

@@ -3076,51 +3076,9 @@ class CarPlayHostActivity : ComponentActivity() {
         return System.nanoTime() - ageMs * 1_000_000L
     }
 
+    /** Wired-only E01: forward touch contacts directly; no gesture interception. */
     private fun onHostTouch(view: View, event: MotionEvent): Boolean {
-        val phase = swipePhase(event.actionMasked) ?: return true
-        val decision = swipe.onTouch(
-            phase = phase,
-            pointerCount = event.pointerCount,
-            eventTime = event.eventTime,
-            centroidX = pointerCentroid(event, horizontal = true),
-            centroidY = pointerCentroid(event, horizontal = false),
-        )
-        when (decision) {
-            ThreeFingerSwipeDetector.Decision.PASS -> Unit
-            ThreeFingerSwipeDetector.Decision.ARM -> {
-                controller?.sendTouch(emptyList())
-                appendLog("Three-finger swipe armed")
-                return true
-            }
-            ThreeFingerSwipeDetector.Decision.CONSUME -> return true
-            ThreeFingerSwipeDetector.Decision.TRIGGER -> {
-                appendLog("Three-finger swipe down: quick bar")
-                // The controller keeps the log line for this gesture as well; it decides nothing.
-                flyController().onGesture(ThreeFingerSwipeDetector.Decision.TRIGGER)
-                showQuickHud()
-                return true
-            }
-            // A sideways fly belongs to the cluster layer: the controller decides, and either way the
-            // rest of this touch stream is consumed rather than forwarded with its down missing.
-            ThreeFingerSwipeDetector.Decision.FLY_LEFT -> {
-                if (activeScreenStreamTypes.isEmpty()) {
-                    DiagLog.i(ClusterFlyLog.TAG, ClusterFlyLog.blocked(FlyBlock.NOT_NAVIGATING))
-                    ClusterFlyWarning.text(FlyBlock.NOT_NAVIGATING)?.let(::showFlyWarning)
-                    return true
-                }
-                flyController().onGesture(ThreeFingerSwipeDetector.Decision.FLY_LEFT)
-                return true
-            }
-            ThreeFingerSwipeDetector.Decision.FLY_RIGHT -> {
-                flyController().onGesture(ThreeFingerSwipeDetector.Decision.FLY_RIGHT)
-                return true
-            }
-        }
-
         val contacts = CarPlayTouchMapper.contacts(event, view.width, view.height)
-        // Only a MOVE may be dropped in transit; every press, release and pointer boundary keeps its
-        // slot. originNs is the finger's own clock, so latency is measured from the touch, not from
-        // when this callback happened to run.
         val move = event.actionMasked == MotionEvent.ACTION_MOVE
         val originNs = uptimeToNanos(event.eventTime)
         val queued = controller?.sendTouch(contacts, move, originNs) ?: false
@@ -3136,58 +3094,6 @@ class CarPlayHostActivity : ComponentActivity() {
             )
         }
         return true
-    }
-
-    /** The six actions the swipe cares about; anything else — hover, batched moves — is not one. */
-    private fun swipePhase(action: Int): ThreeFingerSwipeDetector.Phase? = when (action) {
-        MotionEvent.ACTION_DOWN -> ThreeFingerSwipeDetector.Phase.DOWN
-        MotionEvent.ACTION_MOVE -> ThreeFingerSwipeDetector.Phase.MOVE
-        MotionEvent.ACTION_POINTER_DOWN -> ThreeFingerSwipeDetector.Phase.POINTER_DOWN
-        MotionEvent.ACTION_POINTER_UP -> ThreeFingerSwipeDetector.Phase.POINTER_UP
-        MotionEvent.ACTION_UP -> ThreeFingerSwipeDetector.Phase.UP
-        MotionEvent.ACTION_CANCEL -> ThreeFingerSwipeDetector.Phase.CANCEL
-        else -> null
-    }
-
-    private fun pointerCentroid(event: MotionEvent, horizontal: Boolean): Float {
-        var total = 0f
-        for (index in 0 until event.pointerCount) {
-            total += if (horizontal) event.getX(index) else event.getY(index)
-        }
-        return total / event.pointerCount
-    }
-
-    private fun onScreenStreamStateChanged(generation: Int, type: Int, active: Boolean) {
-        runOnUiThread {
-            if (shuttingDown.get() || generation != restartGeneration) return@runOnUiThread
-            if (active) {
-                activeScreenStreamTypes.add(type)
-                // A live picture is what the cluster flies to; a restart clears the old session's
-                // navigation flag, and this puts it back.
-                flyController().onCarPlayStarted()
-            } else {
-                activeScreenStreamTypes.remove(type)
-            }
-            updateDebugOverlays()
-        }
-    }
-
-    private fun setStatus(message: String) {
-        runOnUiThread {
-            setConnectionStage(message)
-            appendLog(message)
-        }
-    }
-
-    /**
-     * The sentence describing the step in progress. It is drawn under the rung it belongs to, not
-     * at the top of the card, so "the firmware..." arrives next to the rung it is about.
-     */
-    private fun setConnectionStage(message: String) {
-        latestStage = message
-        renderStepDetail()
-        showHandshakeLine(message)
-        updateDebugOverlays()
     }
 
     /** Starts a new phone handshake now and cancels a pending automatic retry. */
